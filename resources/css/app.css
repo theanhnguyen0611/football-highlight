@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+.wrap {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+@media (max-width: 768px) {
+    .wrap { padding: 0 16px; }
+}

@@ -39,7 +39,6 @@ class HomeController extends Controller
 
         // Leagues sidebar
         $leagues = League::withCount('matches')
-            ->having('matches_count', '>', 0)
             ->orderByDesc('matches_count')
             ->get()
             ->map(fn($l) => [

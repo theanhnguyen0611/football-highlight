@@ -6,145 +6,71 @@
         :locale="locale"
         v-slot="{ showScore }"
     >
-        <div style="max-width:1280px;margin:0 auto;padding:20px 24px">
-            <div style="display:grid;grid-template-columns:1fr 270px;gap:24px">
+        <div class="home-wrap">
 
-                <!-- Main -->
-                <div style="display:flex;flex-direction:column;gap:18px">
-
-                    <div style="font-size:11px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.5px;border-left:2px solid #ef4444;padding-left:8px">
-                        {{ filters.q ? `Results: "${filters.q}"` : t('match.latest') }}
-                    </div>
-
-                    <!-- Featured -->
-                    <Link v-if="featured" :href="localePath(`/match/${featured.slug}`)" class="featured-card">
-                        <div class="featured-thumb" :style="featuredBg">
-                            <div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);z-index:0"></div>
-                            <svg class="pitch-lines" viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <rect width="560" height="200" fill="none" stroke="#fff" stroke-width="1.5"/>
-                                <circle cx="280" cy="100" r="38" fill="none" stroke="#fff" stroke-width="1.5"/>
-                                <line x1="280" y1="0" x2="280" y2="200" stroke="#fff" stroke-width="1"/>
-                                <rect x="0" y="58" width="64" height="84" fill="none" stroke="#fff" stroke-width="1.5"/>
-                                <rect x="496" y="58" width="64" height="84" fill="none" stroke="#fff" stroke-width="1.5"/>
-                            </svg>
-
-                            <div class="feat-glow-l" style="z-index:1" :style="{ background: `linear-gradient(90deg, ${featured.home_team?.primary_color || '#1C3C6B'}55 0%, transparent 100%)` }"></div>
-                            <div class="feat-glow-r" style="z-index:1" :style="{ background: `linear-gradient(270deg, ${featured.away_team?.primary_color || '#8b0015'}55 0%, transparent 100%)` }"></div>
-
-                            <div class="feat-teams" style="position:relative;z-index:2">
-                                <div class="feat-team">
-                                    <div class="feat-logo">
-                                        <img v-if="featured.home_team?.logo_url" :src="featured.home_team.logo_url" style="width:52px;height:52px;object-fit:contain" />
-                                        <span v-else style="font-size:16px;font-weight:700;color:#fff">{{ featured.home_team?.initials }}</span>
-                                    </div>
-                                    <span class="feat-name">{{ teamName(featured.home_team) }}</span>
-                                </div>
-
-                                <div class="feat-center">
-                                    <div v-if="showScore" class="feat-score">{{ featured.home_score }} – {{ featured.away_score }}</div>
-                                    <div v-else class="feat-score-hidden">Reveal score</div>
-                                    <span style="font-size:11px;color:#555;margin-top:4px">{{ featured.round || leagueName(featured.league?.name) }}</span>
-                                </div>
-
-                                <div class="feat-team">
-                                    <div class="feat-logo">
-                                        <img v-if="featured.away_team?.logo_url" :src="featured.away_team.logo_url" style="width:52px;height:52px;object-fit:contain" />
-                                        <span v-else style="font-size:16px;font-weight:700;color:#fff">{{ featured.away_team?.initials }}</span>
-                                    </div>
-                                    <span class="feat-name">{{ teamName(featured.away_team) }}</span>
-                                </div>
-                            </div>
-
-                            <div class="feat-play" style="z-index:2"><i class="ti ti-player-play" aria-hidden="true"></i></div>
-                        </div>
-
-                        <div class="feat-info">
-                            <span class="league-badge">{{ leagueName(featured.league?.name) }}</span>
-                            <div style="display:flex;align-items:center;gap:14px">
-                                <span v-if="featured.venue" style="font-size:12px;color:#888;display:flex;align-items:center;gap:4px">
-                                    <i class="ti ti-map-pin" style="font-size:13px" aria-hidden="true"></i>{{ featured.venue }}
-                                </span>
-                                <span style="font-size:12px;color:#888">{{ formatDate(featured.match_date) }}</span>
-                            </div>
-                        </div>
-                    </Link>
-
-                    <!-- Grid -->
-                    <div>
-                        <div style="font-size:11px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.5px;border-left:2px solid #ef4444;padding-left:8px;margin-bottom:14px">
-                            {{ t('match.more') }}
-                        </div>
-                        <div class="match-grid">
-                            <MatchCard
-                                v-for="match in rest"
-                                :key="match.id"
-                                :match="match"
-                                :show-score="showScore"
-                                :locale="locale"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Pagination -->
-                    <div style="display:flex;justify-content:center;gap:6px;margin-top:8px">
-                        <button
-                            v-for="link in matches.links"
-                            :key="link.label"
-                            @click="goToPage(link.url)"
-                            :disabled="!link.url"
-                            class="page-btn"
-                            :class="{ 'page-btn-active': link.active }"
-                            v-html="link.label"
-                        />
-                    </div>
-                </div>
-
-                <!-- Sidebar -->
-                <div style="display:flex;flex-direction:column;gap:16px">
-
-                    <!-- Popular Teams -->
-                    <div class="sidebar-box">
-                        <div class="side-label">Popular Teams</div>
-                        <Link
-                            v-for="team in popular_teams"
-                            :key="team.id"
-                            :href="localePath(`/team/${team.slug}`)"
-                            class="side-team"
-                        >
-                            <div style="display:flex;align-items:center;gap:10px;flex:1;overflow:hidden">
-                                <div class="team-logo">
-                                    <img v-if="team.logo_url" :src="team.logo_url" style="width:20px;height:20px;object-fit:contain" />
-                                    <span v-else style="font-size:9px;font-weight:700;color:#fff">{{ team.initials }}</span>
-                                </div>
-                                <span style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ teamName(team) }}</span>
-                            </div>
-                            <span style="font-size:11px;color:#fff;background:#1a1a1a;padding:2px 8px;border-radius:99px;flex-shrink:0">{{ team.match_count }}</span>
-                        </Link>
-                    </div>
-
-                    <!-- Leagues -->
-                    <div class="sidebar-box">
-                        <div class="side-label">Leagues</div>
-                        <Link
-                            v-for="league in leagues"
-                            :key="league.league_slug"
-                            :href="localePath(`/league/${league.slug}`)"
-                            class="side-league"
-                        >
-                            <span style="font-size:13px;font-weight:600;color:#fff">{{ leagueName(league.name) }}</span>
-                            <span style="font-size:11px;color:#fff;background:#1a1a1a;padding:2px 8px;border-radius:99px;flex-shrink:0">{{ league.match_count }}</span>
-                        </Link>
-                    </div>
-
-                </div>
+            <div class="section-label">
+                {{ filters.q ? `Results: "${filters.q}"` : t('match.latest') }}
             </div>
+
+            <div class="video-grid">
+                <Link
+                    v-for="match in matchList"
+                    :key="match.id"
+                    :href="localePath(`/match/${match.slug}`)"
+                    class="video-card"
+                >
+                    <div class="thumb-wrap">
+                        <div class="thumb" :style="thumbBg(match)"></div>
+                        <div v-if="!match.thumbnail_url" class="thumb-fallback">
+                            <div class="fb-logo">
+                                <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                <span v-else>{{ match.home_team?.initials }}</span>
+                            </div>
+                            <span class="fb-vs">VS</span>
+                            <div class="fb-logo">
+                                <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                <span v-else>{{ match.away_team?.initials }}</span>
+                            </div>
+                        </div>
+                        <div class="play-btn">
+                            <svg width="10" height="12" viewBox="0 0 10 12" fill="white"><polygon points="0,0 10,6 0,12"/></svg>
+                        </div>
+                    </div>
+                    <div class="card-info">
+                        <p class="card-title">
+                            {{ teamName(match.home_team) }}
+                            <span v-if="showScore" class="inline-score"> {{ match.home_score ?? '?' }} - {{ match.away_score ?? '?' }} </span>
+                            <span v-else class="inline-vs"> vs </span>
+                            {{ teamName(match.away_team) }}
+                        </p>
+                        <div class="card-meta">
+                            <span class="meta-league">{{ leagueName(match.league?.name) }}</span>
+                            <span class="meta-sep">|</span>
+                            <span class="meta-date">{{ formatDate(match.match_date) }}</span>
+                        </div>
+                    </div>
+                </Link>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button
+                    v-for="link in matches.links"
+                    :key="link.label"
+                    @click="goToPage(link.url)"
+                    :disabled="!link.url"
+                    class="page-btn"
+                    :class="{ 'page-active': link.active }"
+                    v-html="link.label"
+                />
+            </div>
+
         </div>
     </AppLayout>
 </template>
 
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue'
-import MatchCard from '@/Components/MatchCard.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { computed } from 'vue'
 import { useLocale } from '@/composables/useLocale'
@@ -159,19 +85,25 @@ const props = defineProps({
 
 const { teamName, leagueName, t, localePath } = useLocale(props.locale)
 
-const featured = computed(() => props.matches?.data?.[0] ?? null)
-const rest      = computed(() => props.matches?.data?.slice(1) ?? [])
+const matchList = computed(() => props.matches?.data ?? [])
 
-const featuredBg = computed(() => {
-    if (!featured.value) return {}
-    const h = featured.value.home_team?.primary_color || '#1C3C6B'
-    const a = featured.value.away_team?.primary_color || '#8b0015'
-    return { background: `linear-gradient(135deg, ${h}55 0%, #151515 50%, ${a}55 100%)` }
-})
+function thumbBg(match) {
+    if (match?.thumbnail_url) return {
+        backgroundImage: `url(${match.thumbnail_url})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+    }
+    return { background: '#1a1a1a' }
+}
 
 function formatDate(date) {
     if (!date) return ''
-    return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    const d = new Date(date)
+    const diff = Math.floor((Date.now() - d) / 86400000)
+    if (diff === 0) return 'Today'
+    if (diff === 1) return 'Yesterday'
+    if (diff < 7) return `${diff} days ago`
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }
 
 function goToPage(url) {
@@ -180,40 +112,89 @@ function goToPage(url) {
 </script>
 
 <style scoped>
-.featured-card { display:block;text-decoration:none;background:#181818;border:0.5px solid #252525;border-radius:12px;overflow:hidden;transition:border-color 0.15s; }
-.featured-card:hover { border-color:#333; }
-.featured-card:hover .feat-play { opacity:1;transform:scale(1.08); }
+* { box-sizing: border-box; }
+a { text-decoration: none; color: inherit; }
 
-.featured-thumb { aspect-ratio:16/6;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden; }
-.pitch-lines { position:absolute;inset:0;width:100%;height:100%;opacity:0.08;pointer-events:none; }
-.feat-glow-l { position:absolute;left:0;top:0;bottom:0;width:45%;pointer-events:none; }
-.feat-glow-r { position:absolute;right:0;top:0;bottom:0;width:45%;pointer-events:none; }
+.home-wrap { padding: 24px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 768px) { .home-wrap { padding: 16px; } }
 
-.feat-teams { display:flex;align-items:center;justify-content:space-between;padding:0 8%;width:100%;position:relative;z-index:1; }
-.feat-team { flex:1;display:flex;flex-direction:column;align-items:center;gap:10px; }
-.feat-logo { width:80px;height:80px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.2);background:rgba(20,20,20,0.8);display:flex;align-items:center;justify-content:center; }
-.feat-name { font-size:15px;font-weight:700;color:#fff;text-align:center; }
-.feat-center { display:flex;flex-direction:column;align-items:center;padding:0 20px; }
-.feat-score { font-size:38px;font-weight:700;color:#fff;letter-spacing:-2px;line-height:1; }
-.feat-score-hidden { font-size:13px;font-weight:600;color:#fff;background:#1a1a1a;border:0.5px solid #333;padding:7px 16px;border-radius:7px;cursor:pointer; }
-.feat-play { position:absolute;bottom:14px;right:16px;width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;opacity:0.4;transition:opacity 0.15s,transform 0.15s; }
+.section-label {
+    font-size: 18px; font-weight: 700; color: #fff;
+    border-left: 3px solid #ef4444; padding-left: 12px;
+    margin-bottom: 20px;
+}
 
-.feat-info { padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-top:0.5px solid #252525; }
-.league-badge { font-size:10px;color:#ef4444;background:#1a0000;border:0.5px solid #2a0000;padding:3px 9px;border-radius:3px;text-transform:uppercase;font-weight:700; }
+/* Grid */
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+@media (max-width: 1100px) { .video-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px)  { .video-grid { grid-template-columns: repeat(2, 1fr); } }
 
-.match-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+/* Card */
+.video-card { display: block; }
+.video-card:hover .thumb { transform: scale(1.03); }
 
-.page-btn { padding:5px 12px;border-radius:6px;font-size:13px;background:#1a1a1a;color:#fff;border:0.5px solid #2a2a2a;cursor:pointer;transition:all 0.15s; }
-.page-btn-active { background:#ef4444;border-color:#ef4444; }
-.page-btn:disabled { opacity:0.3;cursor:not-allowed; }
+.thumb-wrap {
+    position: relative; border-radius: 8px; overflow: hidden;
+    aspect-ratio: 4/3; margin-bottom: 10px; background: #1a1a1a;
+}
 
-.sidebar-box { background:#181818;border:0.5px solid #252525;border-radius:10px;padding:14px 16px; }
-.side-label { font-size:10px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.6px;border-left:2px solid #ef4444;padding-left:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:0.5px solid #222; }
-.side-team { display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #1a1a1a;text-decoration:none;gap:8px;transition:opacity 0.15s; }
-.side-team:last-child { border-bottom:none; }
-.side-team:hover { opacity:0.8; }
-.team-logo { width:32px;height:32px;border-radius:50%;border:1px solid #333;background:#1a1a1a;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
-.side-league { display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #1a1a1a;text-decoration:none;transition:opacity 0.15s; }
-.side-league:last-child { border-bottom:none; }
-.side-league:hover { opacity:0.8; }
+.thumb { width: 100%; height: 100%; transition: transform 0.2s ease; position: relative; }
+
+.thumb-fallback {
+    position: absolute; inset: 0; z-index: 1;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    background: linear-gradient(135deg, #2a2a3e 0%, #222 50%, #2a1a1a 100%);
+}
+.fb-logo {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: #fff; border: 1px solid #e5e5e5;
+    display: flex; align-items: center; justify-content: center;
+}
+.fb-logo img { width: 36px; height: 36px; object-fit: contain; display: block; }
+.fb-logo span { font-size: 11px; font-weight: 700; color: #fff; }
+.fb-vs { font-size: 18px; font-weight: 700; color: #ef4444; }
+
+.play-btn {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 52px; height: 52px; border-radius: 50%;
+    background: #ef4444;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(239,68,68,0.5);
+    z-index: 2; transition: transform 0.15s;
+}
+.video-card:hover .play-btn { transform: translate(-50%, -50%) scale(1.1); }
+
+.league-chip {
+    position: absolute; top: 8px; left: 8px;
+    font-size: 9px; font-weight: 700; color: #fff;
+    background: rgba(0,0,0,0.6); padding: 2px 7px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    backdrop-filter: blur(4px); z-index: 2;
+}
+
+/* Info */
+.card-info { padding: 0 2px; }
+.card-title {
+    font-size: 16px; font-weight: 600; color: #fff;
+    line-height: 1.4; margin: 0 0 6px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.inline-score { font-weight: 700; color: #ef4444; margin: 0 2px; }
+.inline-vs { font-weight: 600; color: #ef4444; margin: 0 2px; }
+.card-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.meta-league { color: #fff; font-weight: 700; background: #ef4444; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+.meta-sep { color: #444; }
+.meta-date { color: #9ca3af; }
+
+/* Pagination */
+.pagination { display: flex; justify-content: center; gap: 8px; margin-top: 32px; flex-wrap: wrap; }
+.page-btn { padding: 10px 18px; border-radius: 8px; font-size: 15px; font-weight: 600; min-width: 44px; background: #1a1a1a; color: #fff; border: 0.5px solid #2a2a2a; cursor: pointer; transition: all 0.15s; }
+.page-btn:hover { border-color: #444; }
+.page-active { background: #ef4444; border-color: #ef4444; }
+.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 </style>

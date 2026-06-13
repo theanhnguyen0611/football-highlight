@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 
 class Team extends Model
 {
+    protected $appends = ['logo_url'];
+
     protected $fillable = [
         'name', 'slug', 'type', 'country',
         'logo_path', 'highlightly_id',

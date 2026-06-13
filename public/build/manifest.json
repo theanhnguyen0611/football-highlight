@@ -1,0 +1,61 @@
+{
+  "__plugin-vue_export-helper-XjY9NlK6.js": {
+    "file": "assets/_plugin-vue_export-helper-XjY9NlK6.js",
+    "name": "_plugin-vue_export-helper",
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/_plugin-vue_export-helper-efJk-4Pr.css"
+    ]
+  },
+  "__plugin-vue_export-helper-efJk-4Pr.css": {
+    "file": "assets/_plugin-vue_export-helper-efJk-4Pr.css",
+    "src": "__plugin-vue_export-helper-efJk-4Pr.css"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-nscFEEzE.css",
+    "name": "app",
+    "names": [
+      "app.css"
+    ],
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/js/Pages/Home.vue": {
+    "file": "assets/Home-D2mkKqUM.js",
+    "name": "Home",
+    "src": "resources/js/Pages/Home.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-XjY9NlK6.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/Home-DNkzonMA.css"
+    ]
+  },
+  "resources/js/Pages/Match.vue": {
+    "file": "assets/Match-DLCMuSlL.js",
+    "name": "Match",
+    "src": "resources/js/Pages/Match.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-XjY9NlK6.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/Match-C53w6gOm.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-DlqavDz4.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/Pages/Home.vue",
+      "resources/js/Pages/Match.vue"
+    ]
+  }
+}

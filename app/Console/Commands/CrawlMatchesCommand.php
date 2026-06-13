@@ -40,3 +40,7 @@ class CrawlMatchesCommand extends Command
         $this->info('Done!');
     }
 }
+// Thêm vào cuối handle() method, trước $this->info('Done!'):
+// $this->info('Step 4: Syncing scores from match events...');
+// $scored = $highlightly->syncScores(50);
+// $this->line("  Scored: {$scored} matches");
