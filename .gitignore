@@ -3,6 +3,8 @@
 .env
 /storage/app/public/logos
 /storage/app/highlights
+/storage/app/public/highlights
+/storage/app/public/full-matches
 .DS_Store
 public/hot
 /public/build
