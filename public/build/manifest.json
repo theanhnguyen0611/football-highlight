@@ -1,20 +1,35 @@
 {
-  "__plugin-vue_export-helper-XjY9NlK6.js": {
-    "file": "assets/_plugin-vue_export-helper-XjY9NlK6.js",
-    "name": "_plugin-vue_export-helper",
+  "_AppLayout-BYlGPo92.js": {
+    "file": "assets/AppLayout-BYlGPo92.js",
+    "name": "AppLayout",
     "imports": [
       "resources/js/app.js"
     ],
     "css": [
-      "assets/_plugin-vue_export-helper-efJk-4Pr.css"
+      "assets/AppLayout-D7-QUJNB.css"
     ]
   },
-  "__plugin-vue_export-helper-efJk-4Pr.css": {
-    "file": "assets/_plugin-vue_export-helper-efJk-4Pr.css",
-    "src": "__plugin-vue_export-helper-efJk-4Pr.css"
+  "_AppLayout-D7-QUJNB.css": {
+    "file": "assets/AppLayout-D7-QUJNB.css",
+    "src": "_AppLayout-D7-QUJNB.css"
+  },
+  "__plugin-vue_export-helper-BDNMzG2s.js": {
+    "file": "assets/_plugin-vue_export-helper-BDNMzG2s.js",
+    "name": "_plugin-vue_export-helper"
+  },
+  "_hls-B8WWmhnC.js": {
+    "file": "assets/hls-B8WWmhnC.js",
+    "name": "hls",
+    "css": [
+      "assets/hls-BV0mtPOj.css"
+    ]
+  },
+  "_hls-BV0mtPOj.css": {
+    "file": "assets/hls-BV0mtPOj.css",
+    "src": "_hls-BV0mtPOj.css"
   },
   "resources/css/app.css": {
-    "file": "assets/app-nscFEEzE.css",
+    "file": "assets/app-CTE923pu.css",
     "name": "app",
     "names": [
       "app.css"
@@ -22,40 +37,103 @@
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/js/Pages/Embed.vue": {
+    "file": "assets/Embed-C0kMgrWB.js",
+    "name": "Embed",
+    "src": "resources/js/Pages/Embed.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "resources/js/app.js",
+      "_hls-B8WWmhnC.js"
+    ],
+    "css": [
+      "assets/Embed-DSRtQmla.css"
+    ]
+  },
   "resources/js/Pages/Home.vue": {
-    "file": "assets/Home-D2mkKqUM.js",
+    "file": "assets/Home-DJd73RIS.js",
     "name": "Home",
     "src": "resources/js/Pages/Home.vue",
     "isDynamicEntry": true,
     "imports": [
-      "__plugin-vue_export-helper-XjY9NlK6.js",
-      "resources/js/app.js"
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "resources/js/app.js",
+      "_AppLayout-BYlGPo92.js"
     ],
     "css": [
-      "assets/Home-DNkzonMA.css"
+      "assets/Home-Cp_xVScA.css"
+    ]
+  },
+  "resources/js/Pages/League.vue": {
+    "file": "assets/League-IR7kp8wg.js",
+    "name": "League",
+    "src": "resources/js/Pages/League.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "resources/js/app.js",
+      "_AppLayout-BYlGPo92.js"
+    ],
+    "css": [
+      "assets/League-BiUbvW59.css"
     ]
   },
   "resources/js/Pages/Match.vue": {
-    "file": "assets/Match-DLCMuSlL.js",
+    "file": "assets/Match-BWIexk5B.js",
     "name": "Match",
     "src": "resources/js/Pages/Match.vue",
     "isDynamicEntry": true,
     "imports": [
-      "__plugin-vue_export-helper-XjY9NlK6.js",
-      "resources/js/app.js"
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "resources/js/app.js",
+      "_hls-B8WWmhnC.js",
+      "_AppLayout-BYlGPo92.js"
     ],
     "css": [
-      "assets/Match-C53w6gOm.css"
+      "assets/Match-CYQeGtXb.css"
+    ]
+  },
+  "resources/js/Pages/Search.vue": {
+    "file": "assets/Search-B29qFfD_.js",
+    "name": "Search",
+    "src": "resources/js/Pages/Search.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "resources/js/app.js",
+      "_AppLayout-BYlGPo92.js"
+    ],
+    "css": [
+      "assets/Search-DC0g__IS.css"
+    ]
+  },
+  "resources/js/Pages/Team.vue": {
+    "file": "assets/Team-0asOdv44.js",
+    "name": "Team",
+    "src": "resources/js/Pages/Team.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "resources/js/app.js",
+      "_AppLayout-BYlGPo92.js"
+    ],
+    "css": [
+      "assets/Team-BF56koQe.css"
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DlqavDz4.js",
+    "file": "assets/app-BRsXgeHu.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "dynamicImports": [
+      "resources/js/Pages/Embed.vue",
       "resources/js/Pages/Home.vue",
-      "resources/js/Pages/Match.vue"
+      "resources/js/Pages/League.vue",
+      "resources/js/Pages/Match.vue",
+      "resources/js/Pages/Search.vue",
+      "resources/js/Pages/Team.vue"
     ]
   }
 }
