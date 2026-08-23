@@ -106,7 +106,7 @@ class HighlightlyService
         foreach ($res['data'] ?? [] as $m) {
             if (!in_array($m['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
             if ($this->mapStatus($m['state']['description'] ?? null) !== 'finished') continue;
-            if (($m['homeScore'] ?? null) === null) continue;
+            if (!$this->hasScore($m)) continue;
             if ($this->upsertMatch($m)) $matchCount++;
         }
 
@@ -118,7 +118,7 @@ class HighlightlyService
             $md = $h['match'] ?? null;
             if (!$md || !in_array($md['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
             if ($this->mapStatus($md['state']['description'] ?? null) !== 'finished') continue;
-            if (($md['homeScore'] ?? null) === null) continue;
+            if (!$this->hasScore($md)) continue;
             if (!FootballMatch::where('highlightly_id', $md['id'])->exists()) {
                 if ($this->upsertMatch($md)) $videoCount++;
             }
@@ -292,8 +292,8 @@ class HighlightlyService
                     'home_team_id'   => $homeTeam->id,
                     'away_team_id'   => $awayTeam->id,
                     'league_id'      => $league?->id,
-                    'home_score'     => $m['homeScore'] ?? null,
-                    'away_score'     => $m['awayScore'] ?? null,
+                    'home_score'     => $this->parseScore($m, 'home'),
+                    'away_score'     => $this->parseScore($m, 'away'),
                     'match_date'     => $date,
                     'round'          => $m['round'] ?? null,
                     'match_status'   => $this->mapStatus($m['state']['description'] ?? null),
@@ -304,6 +304,24 @@ class HighlightlyService
             Log::error("Highlightly upsertMatch error: " . $e->getMessage());
             return null;
         }
+    }
+
+    private function hasScore(array $m): bool
+    {
+        if (isset($m['homeScore'])) return true;
+        $current = $m['state']['score']['current'] ?? null;
+        return $current !== null && str_contains($current, ' - ');
+    }
+
+    private function parseScore(array $m, string $side): ?int
+    {
+        if (isset($m['homeScore'])) {
+            return $side === 'home' ? (int) $m['homeScore'] : (int) $m['awayScore'];
+        }
+        $current = $m['state']['score']['current'] ?? null;
+        if (!$current || !str_contains($current, ' - ')) return null;
+        [$home, $away] = explode(' - ', $current, 2);
+        return $side === 'home' ? (int) trim($home) : (int) trim($away);
     }
 
     private function mapStatus(?string $description): string
