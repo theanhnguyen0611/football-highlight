@@ -287,7 +287,7 @@ class DownloadService
         $localDir = storage_path("app/public/{$relDir}");
 
         $cmd = sprintf(
-            'rsync -az --no-perms %s/ %s:%s/%s/ && rm -rf %s',
+            'rsync -az --mkpath --no-perms %s/ %s:%s/%s/ && rm -rf %s',
             escapeshellarg($localDir),
             $ssh,
             $base,
