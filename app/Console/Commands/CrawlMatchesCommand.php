@@ -40,6 +40,9 @@ class CrawlMatchesCommand extends Command
         $downloaded = $download->downloadAllPending();
         $this->line("  Downloaded: {$downloaded} videos");
 
+        $this->info('Step 6: Download new logos...');
+        $this->call('logos:download');
+
         $this->info('Done!');
     }
 }
