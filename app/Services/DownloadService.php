@@ -143,14 +143,23 @@ class DownloadService
                     preg_match('/#EXTINF:([\d.]+)/', $line, $m);
                     $duration += (float) ($m[1] ?? 0);
                 }
+                // Download init segment từ #EXT-X-MAP (CMAF/fMP4 format)
+                if (str_starts_with($line, '#EXT-X-MAP:')) {
+                    preg_match('/#EXT-X-MAP:URI="([^"]+)"/', $line, $m);
+                    if (!empty($m[1])) {
+                        $initUri  = $m[1];
+                        $initUrl  = str_starts_with($initUri, 'http') ? $initUri : $base . $initUri;
+                        $initName = basename(parse_url($initUrl, PHP_URL_PATH));
+                        if ($initName) $this->curlDownload($initUrl, "{$segmentDir}/{$initName}");
+                    }
+                }
                 if ($line && !str_starts_with($line, '#')) {
                     $segments[] = str_starts_with($line, 'http') ? $line : $base . $line;
                 }
             }
 
             foreach ($segments as $idx => $segUrl) {
-                preg_match('/\/([^\/\?]+\.ts)/', $segUrl, $m);
-                $segName = $m[1] ?? "seg_{$idx}.ts";
+                $segName = basename(parse_url($segUrl, PHP_URL_PATH)) ?: "seg_{$idx}.ts";
                 $segPath = "{$segmentDir}/{$segName}";
                 if (file_exists($segPath) && filesize($segPath) > 0) {
                     $totalSize += filesize($segPath);
