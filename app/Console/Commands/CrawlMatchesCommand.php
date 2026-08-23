@@ -43,6 +43,9 @@ class CrawlMatchesCommand extends Command
         $this->info('Step 6: Download new logos...');
         $this->call('logos:download');
 
+        $this->info('Step 7: Set league backgrounds...');
+        $this->call('leagues:set-backgrounds');
+
         $this->info('Done!');
     }
 }
