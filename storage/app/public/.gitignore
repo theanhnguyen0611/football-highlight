@@ -1,2 +1,17 @@
 *
 !.gitignore
+!leagues/
+leagues/*
+!leagues/*.png
+!leagues/*.jpg
+!leagues/*.webp
+!leagues/backgrounds/
+leagues/backgrounds/*
+!leagues/backgrounds/*.webp
+!logos/
+logos/*
+!logos/leagues/
+logos/leagues/*
+!logos/leagues/*.png
+!logos/leagues/*.jpg
+!logos/leagues/*.webp
