@@ -40,6 +40,10 @@ return [
         'url' => env('API_FOOTBALL_URL', 'https://v3.football.api-sports.io'),
     ],
 
+    'highlightly' => [
+        'key' => env('HIGHLIGHTLY_KEY'),
+    ],
+
     'cdn' => [
         'url'      => env('CDN_URL'),
         'sx65_ssh' => env('SX65_SSH'),
