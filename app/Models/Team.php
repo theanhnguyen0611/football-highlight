@@ -31,14 +31,14 @@ class Team extends Model
         return $this->hasMany(FootballMatch::class, 'away_team_id');
     }
 
-    // Logo URL — handle cả external URL (API-Football) và local path
     public function getLogoUrlAttribute(): ?string
     {
         if (!$this->logo_path) return null;
-        if (str_starts_with($this->logo_path, 'http')) {
-            return $this->logo_path;
-        }
-        return Storage::url($this->logo_path);
+        if (str_starts_with($this->logo_path, 'http')) return $this->logo_path;
+        $cdn = config('services.cdn.url');
+        return $cdn
+            ? rtrim($cdn, '/') . '/bolareel/logos/' . $this->logo_path
+            : Storage::url($this->logo_path);
     }
 
     // Tên theo locale — chỉ dịch national team

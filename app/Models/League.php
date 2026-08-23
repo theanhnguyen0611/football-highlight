@@ -21,7 +21,10 @@ class League extends Model
     {
         if (!$this->logo_path) return null;
         if (str_starts_with($this->logo_path, 'http')) return $this->logo_path;
-        return asset('storage/' . $this->logo_path);
+        $cdn = config('services.cdn.url');
+        return $cdn
+            ? rtrim($cdn, '/') . '/bolareel/logos/' . $this->logo_path
+            : asset('storage/' . $this->logo_path);
     }
 
     public function getBackgroundUrlFullAttribute(): ?string
