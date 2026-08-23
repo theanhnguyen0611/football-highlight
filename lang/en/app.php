@@ -22,6 +22,6 @@ return [
         'all_matches' => 'All Matches',
     ],
     'footer' => [
-        'copyright' => '© :year FootHighlight. All rights reserved.',
+        'copyright' => '© :year BolaReel. All rights reserved.',
     ],
 ];

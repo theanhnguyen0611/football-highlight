@@ -41,7 +41,7 @@ class MatchController extends Controller
 
     public function show(string $slug): MatchResource
     {
-        $match = FootballMatch::with(['homeTeam.translations', 'awayTeam.translations', 'videos'])
+        $match = FootballMatch::with(['homeTeam.translations', 'awayTeam.translations', 'videos', 'events'])
             ->where('slug', $slug)
             ->firstOrFail();
 

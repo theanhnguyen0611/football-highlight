@@ -7,8 +7,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class League extends Model
 {
     protected $fillable = [
-        'name', 'slug', 'logo_path', 'country', 'highlightly_id',
+        'name', 'slug', 'logo_path', 'background_url', 'primary_color', 'country', 'highlightly_id',
     ];
+
+    protected $appends = ['background_url_full'];
 
     public function matches(): HasMany
     {
@@ -20,5 +22,11 @@ class League extends Model
         if (!$this->logo_path) return null;
         if (str_starts_with($this->logo_path, 'http')) return $this->logo_path;
         return asset('storage/' . $this->logo_path);
+    }
+
+    public function getBackgroundUrlFullAttribute(): ?string
+    {
+        if (!$this->background_url) return null;
+        return asset('storage/' . $this->background_url);
     }
 }

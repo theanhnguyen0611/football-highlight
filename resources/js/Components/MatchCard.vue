@@ -55,7 +55,7 @@
 
 <script setup>
 import { Link } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { toRef } from 'vue'
 import { useLocale } from '@/composables/useLocale'
 
 const props = defineProps({
@@ -64,18 +64,9 @@ const props = defineProps({
     locale:    { type: String,  default: 'en' },
 })
 
-const { teamName, leagueName, localePath } = useLocale(props.locale)
+const { teamName, leagueName, localePath } = useLocale(toRef(props, 'locale'))
 
-const thumbBg = computed(() => {
-    if (props.match.thumbnail_url) {
-        return {
-            backgroundImage: `url(${props.match.thumbnail_url})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-        }
-    }
-    return { background: 'linear-gradient(135deg, #1C3C6B44 0%, #0d0d0d 50%, #8b001544 100%)' }
-})
+const thumbBg = { background: 'linear-gradient(135deg, #1C3C6B44 0%, #0d0d0d 50%, #8b001544 100%)' }
 
 function formatDate(date) {
     if (!date) return ''

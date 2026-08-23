@@ -15,7 +15,7 @@
                 </div>
                 <Link :href="localePath('/')" class="logo">
                     <span class="logo-dot"></span>
-                    <span class="logo-text">FootHighlight</span>
+                    <span class="logo-text">BolaReel</span>
                 </Link>
                 <div class="topbar-right">
                     <div class="search-wrap">
@@ -29,7 +29,7 @@
                             </button>
                         </div>
                         <div v-if="showSuggestions && !searchQuery" class="suggestions">
-                            <div class="suggestions-label">Popular Teams</div>
+                            <div class="suggestions-label">{{ t('nav.popular_teams') }}</div>
                             <Link v-for="team in popularTeams.slice(0,5)" :key="team.id" :href="localePath(`/team/${team.slug}`)" class="suggestion-row">
                                 <div class="sug-avatar">{{ team.initials }}</div>
                                 <span class="sug-name">{{ teamName(team) }}</span>
@@ -60,11 +60,11 @@
             <div v-if="showMobileSearch" class="mobile-overlay" @click.self="showMobileSearch = false">
                 <div class="mobile-search-bar">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input v-model="searchQuery" type="text" placeholder="Search matches..." class="mobile-search-input" @keyup.enter="search(); showMobileSearch = false" />
+                    <input v-model="searchQuery" type="text" :placeholder="t('nav.search')" class="mobile-search-input" @keyup.enter="search(); showMobileSearch = false" />
                     <button @click="showMobileSearch = false" class="mobile-close">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
-                    <button class="mobile-search-go" @click="search(); showMobileSearch = false">Search</button>
+                    <button class="mobile-search-go" @click="search(); showMobileSearch = false">{{ t('nav.search_btn') }}</button>
                 </div>
             </div>
         </Transition>
@@ -80,13 +80,13 @@
                         <div class="nav-big-logo">
                             <img :src="item.logo" :alt="item.name" />
                         </div>
-                        <span class="nav-big-name">{{ item.name }}</span>
+                        <span class="nav-big-name">{{ leagueName(item) }}</span>
                     </Link>
                 </div>
             </div>
             <!-- Mobile: pills -->
             <div class="nav-mobile hide-scroll">
-                <Link :href="localePath('/')" class="pill" :class="{ 'pill-active': !currentLeague }">All</Link>
+                <Link :href="localePath('/')" class="pill" :class="{ 'pill-active': !currentLeague }">{{ t('nav.all') }}</Link>
                 <Link v-for="item in navLeagues" :key="item.slug"
                     :href="localePath(`/league/${item.slug}`)"
                     class="pill" :class="{ 'pill-active': currentLeague === item.slug }">
@@ -101,20 +101,20 @@
             <div v-if="showMegaMenu" class="drawer-overlay" @click="showMegaMenu = false">
                 <div class="drawer" @click.stop>
                     <div class="drawer-header">
-                        <span class="drawer-title">Menu</span>
+                        <span class="drawer-title">{{ t('nav.menu') }}</span>
                         <button class="drawer-close" @click="showMegaMenu = false">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
                     <div class="drawer-section">
-                        <div class="drawer-label">Leagues</div>
+                        <div class="drawer-label">{{ t('nav.leagues') }}</div>
                         <Link v-for="item in [...navLeagues, ...moreLeagues]" :key="item.slug" :href="localePath(`/league/${item.slug}`)" class="drawer-item" @click="showMegaMenu = false">
                             <div class="drawer-avatar"><img :src="item.logo" /></div>
-                            <span>{{ item.name }}</span>
+                            <span>{{ leagueName(item) }}</span>
                         </Link>
                     </div>
                     <div class="drawer-section">
-                        <div class="drawer-label">Popular Teams</div>
+                        <div class="drawer-label">{{ t('nav.popular_teams') }}</div>
                         <Link v-for="team in popularTeams.slice(0,12)" :key="team.id" :href="localePath(`/team/${team.slug}`)" class="drawer-item" @click="showMegaMenu = false">
                             <div class="drawer-avatar">
                                 <img v-if="team.logo_url" :src="team.logo_url" />
@@ -135,8 +135,62 @@
 
         <!-- FOOTER -->
         <footer class="footer">
-            <div class="nav-inner">
-                © {{ new Date().getFullYear() }} FootHighlight · All rights reserved
+            <div class="footer-inner">
+                <div class="footer-top">
+                    <!-- Brand -->
+                    <div class="footer-brand">
+                        <Link :href="localePath('/')" class="footer-logo">
+                            <span class="logo-dot"></span>
+                            <span class="logo-text">BolaReel</span>
+                        </Link>
+                        <p class="footer-tagline">{{ t('footer.tagline') }}</p>
+                    </div>
+
+                    <!-- Top Leagues -->
+                    <div class="footer-col">
+                        <h3 class="footer-col-title">{{ t('nav.leagues') }}</h3>
+                        <Link v-for="item in navLeagues.slice(0, 6)" :key="item.slug"
+                            :href="localePath(`/league/${item.slug}`)"
+                            class="footer-link">
+                            <img :src="item.logo" class="footer-link-logo" :alt="item.name" />
+                            <span>{{ leagueName(item) }}</span>
+                        </Link>
+                    </div>
+
+                    <!-- More Leagues -->
+                    <div class="footer-col">
+                        <h3 class="footer-col-title">{{ t('footer.more_leagues') }}</h3>
+                        <Link v-for="item in [...navLeagues.slice(6), ...moreLeagues.slice(0, 5)]" :key="item.slug"
+                            :href="localePath(`/league/${item.slug}`)"
+                            class="footer-link">
+                            <span>{{ leagueName(item) }}</span>
+                        </Link>
+                    </div>
+
+                    <!-- Popular Teams -->
+                    <div class="footer-col">
+                        <h3 class="footer-col-title">{{ t('nav.popular_teams') }}</h3>
+                        <Link v-for="team in footerTeams" :key="team.id"
+                            :href="localePath(`/team/${team.slug}`)"
+                            class="footer-link">
+                            <div class="footer-team-avatar">
+                                <img v-if="team.logo_url" :src="team.logo_url" :alt="team.name" />
+                                <span v-else>{{ team.initials }}</span>
+                            </div>
+                            <span>{{ teamName(team) }}</span>
+                        </Link>
+                    </div>
+                </div>
+
+                <div class="footer-bottom">
+                    <span class="footer-copy">© {{ new Date().getFullYear() }} BolaReel · {{ t('footer.rights') }}</span>
+                    <div class="footer-bottom-links">
+                        <span v-for="(lang, i) in languages" :key="lang.code">
+                            <button class="footer-bottom-lang" :class="{ active: lang.code === currentLocale }" @click="switchLocale(lang.code)">{{ lang.name }}</button>
+                            <span v-if="i < languages.length - 1" class="footer-sep">·</span>
+                        </span>
+                    </div>
+                </div>
             </div>
         </footer>
 
@@ -145,7 +199,7 @@
 
 <script setup>
 import { Link, router } from '@inertiajs/vue3'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, toRef, onMounted, onUnmounted } from 'vue'
 import { useLocale } from '@/composables/useLocale'
 
 const props = defineProps({
@@ -155,7 +209,7 @@ const props = defineProps({
     locale:        { type: String, default: 'en' },
 })
 
-const { t, teamName, leagueName, localePath } = useLocale(props.locale)
+const { t, teamName, leagueName, localePath } = useLocale(toRef(props, 'locale'))
 
 const searchQuery      = ref('')
 const searchFocused    = ref(false)
@@ -165,7 +219,6 @@ const showMegaMenu     = ref(false)
 const showMobileSearch = ref(false)
 const currentLocale    = ref(props.locale || 'en')
 const showScore        = ref(localStorage.getItem('showScore') === 'true')
-const scrolled         = ref(false)
 
 function toggleScore() {
     showScore.value = !showScore.value
@@ -183,25 +236,26 @@ const navLeagues = [
     { slug: 'copa-america',          name: 'Copa América',     abbr: 'CA',  logo: '/storage/logos/leagues/copa-america.png' },
     { slug: 'euro-championship',     name: 'EURO',             abbr: 'EUR', logo: '/storage/logos/leagues/euro-championship.png' },
     { slug: 'world-cup',             name: 'World Cup',        abbr: 'WC',  logo: '/storage/logos/leagues/world-cup.png' },
-    { slug: 'friendlies',            name: 'Friendlies',       abbr: 'FRI', logo: '/storage/logos/leagues/friendlies.png',            dark: true },
+    { slug: 'international-friendlies', name: 'International Friendlies', abbr: 'INT', logo: '/storage/logos/leagues/friendlies.png', dark: true },
 ]
 
 const moreLeagues = [
     { slug: 'concacaf-champions-league', name: 'CONCACAF CL',        abbr: 'CCL', logo: '/storage/logos/leagues/concacaf-champions-league.png' },
     { slug: 'major-league-soccer',       name: 'MLS',                abbr: 'MLS', logo: '/storage/logos/leagues/major-league-soccer.png' },
     { slug: 'super-lig',                 name: 'Süper Lig',          abbr: 'SL',  logo: '/storage/logos/leagues/super-lig.png' },
-    { slug: 'liga-profesional-argentina',name: 'Liga Argentina',     abbr: 'LPA', logo: '/storage/logos/leagues/liga-profesional-argentina.png' },
     { slug: 'eredivisie',                name: 'Eredivisie',         abbr: 'ERE', logo: '/storage/logos/leagues/eredivisie.png' },
-    { slug: 'liga-mx',                   name: 'Liga MX',            abbr: 'MX',  logo: '/storage/logos/leagues/liga-mx.png' },
     { slug: 'primeira-liga',             name: 'Primeira Liga',      abbr: 'PL',  logo: '/storage/logos/leagues/primeira-liga.png' },
+    { slug: 'championship',              name: 'Championship',       abbr: 'CH',  logo: '/storage/logos/leagues/championship.png' },
+    { slug: 'league-cup',               name: 'Carabao Cup',        abbr: 'CC',  logo: '/storage/logos/leagues/league-cup.png' },
     { slug: 'fa-cup',                    name: 'FA Cup',             abbr: 'FA',  logo: '/storage/logos/leagues/fa-cup.png' },
     { slug: 'dfb-pokal',                 name: 'DFB Pokal',          abbr: 'DFB', logo: '/storage/logos/leagues/dfb-pokal.png' },
     { slug: 'coupe-de-france',           name: 'Coupe de France',    abbr: 'CDF', logo: '/storage/logos/leagues/coupe-de-france.png' },
     { slug: 'copa-del-rey',              name: 'Copa del Rey',       abbr: 'CDR', logo: '/storage/logos/leagues/copa-del-rey.png' },
     { slug: 'coppa-italia',              name: 'Coppa Italia',       abbr: 'CI',  logo: '/storage/logos/leagues/coppa-italia.png' },
     { slug: 'uefa-nations-league',       name: 'UEFA Nations League',abbr: 'UNL', logo: '/storage/logos/leagues/uefa-nations-league.png' },
-    { slug: 'jupiler-pro-league',        name: 'Jupiler Pro League', abbr: 'JPL', logo: '/storage/logos/leagues/jupiler-pro-league.png' },
     { slug: 'concacaf-gold-cup',         name: 'CONCACAF Gold Cup',  abbr: 'CGC', logo: '/storage/logos/leagues/concacaf-gold-cup.png' },
+    { slug: 'saudi-pro-league',          name: 'Saudi Pro League',   abbr: 'SPL', logo: '/storage/logos/leagues/saudi-pro-league.png' },
+    { slug: 'club-friendlies',           name: 'Club Friendlies',    abbr: 'CLB', logo: '/storage/logos/leagues/friendlies.png' },
 ]
 
 const languages = [
@@ -210,20 +264,39 @@ const languages = [
     { code: 'pt', name: 'Português', flag: '🇧🇷' },
     { code: 'ar', name: 'العربية',   flag: '🇸🇦' },
     { code: 'id', name: 'Indonesia', flag: '🇮🇩' },
-    { code: 'bn', name: 'বাংলা',     flag: '🇧🇩' },
     { code: 'ja', name: '日本語',     flag: '🇯🇵' },
     { code: 'fr', name: 'Français',  flag: '🇫🇷' },
     { code: 'de', name: 'Deutsch',   flag: '🇩🇪' },
     { code: 'tr', name: 'Türkçe',    flag: '🇹🇷' },
-    { code: 'sw', name: 'Kiswahili', flag: '🇰🇪' },
     { code: 'hi', name: 'हिन्दी',    flag: '🇮🇳' },
 ]
 
 const currentLang = computed(() => languages.find(l => l.code === currentLocale.value) || languages[0])
 
+const FAMOUS_TEAM_SLUGS = [
+    'real-madrid', 'barcelona', 'manchester-city', 'manchester-united',
+    'liverpool', 'chelsea', 'arsenal', 'tottenham',
+    'paris-saint-germain', 'bayern-munich', 'borussia-dortmund',
+    'juventus', 'ac-milan', 'inter-milan', 'napoli',
+    'atletico-madrid', 'ajax', 'benfica', 'porto',
+    'river-plate', 'boca-juniors', 'flamengo', 'palmeiras',
+    'galatasaray', 'fenerbahce',
+]
+
+const footerTeams = computed(() => {
+    const all = props.popularTeams ?? []
+    const famous = FAMOUS_TEAM_SLUGS
+        .map(slug => all.find(t => t.slug === slug))
+        .filter(Boolean)
+    const rest = all
+        .filter(t => !FAMOUS_TEAM_SLUGS.includes(t.slug))
+        .sort((a, b) => b.match_count - a.match_count)
+    return [...famous, ...rest].slice(0, 8)
+})
+
 function search() {
     if (searchQuery.value.trim()) {
-        router.get(localePath('/'), { q: searchQuery.value })
+        router.get(localePath('/search'), { q: searchQuery.value })
         showSuggestions.value = false
         showMobileSearch.value = false
     }
@@ -233,7 +306,7 @@ function switchLocale(code) {
     currentLocale.value = code
     showLangMenu.value = false
     const path = window.location.pathname
-    const cleanPath = path.replace(/^\/(es|pt|ar|id|bn|ja|fr|de|tr|sw|hi)/, '') || '/'
+    const cleanPath = path.replace(/^\/(es|pt|ar|id|ja|fr|de|tr|hi)/, '') || '/'
     router.visit(code === 'en' ? cleanPath : `/${code}${cleanPath}`)
 }
 
@@ -243,10 +316,7 @@ function handleClickOutside() {
     showSuggestions.value = false
 }
 
-onMounted(() => {
-    document.addEventListener('click', handleClickOutside)
-    window.addEventListener('scroll', () => { scrolled.value = window.scrollY > 60 }, { passive: true })
-})
+onMounted(() => document.addEventListener('click', handleClickOutside))
 onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 </script>
 
@@ -254,7 +324,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 *, *::before, *::after { box-sizing: border-box; }
 a { text-decoration: none; color: inherit; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; background: #0f0f0f; color: #fff; font-family: system-ui, -apple-system, sans-serif; }
+.app { min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; background: #000000; color: #fff; font-family: system-ui, -apple-system, sans-serif; }
 
 /* ── SINGLE WRAPPER — dùng cho tất cả sections ── */
 .nav-inner {
@@ -266,16 +336,16 @@ a { text-decoration: none; color: inherit; }
 @media (max-width: 768px) { .nav-inner { padding: 0 16px; } }
 
 /* ── TOPBAR ── */
-.topbar { background: #0f0f0f; border-bottom: 0.5px solid #222; position: sticky; top: 0; z-index: 50; }
+.topbar { background: #000000; border-bottom: 0.5px solid #222; position: sticky; top: 0; z-index: 50; }
 .topbar-inner { width: 100%; max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; }
 @media (max-width: 768px) { .topbar-inner { padding: 0 16px; } }
-.topbar-left { display: flex; align-items: center; gap: 8px; }
-.topbar-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.topbar-left { display: flex; align-items: center; gap: 8px; flex: 1; }
+.topbar-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex: 1; }
 .logo { display: flex; align-items: center; gap: 8px; position: absolute; left: 50%; transform: translateX(-50%); }
 .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: block; }
 .logo-text { font-size: 20px; font-weight: 700; color: #fff; }
 
-.action-btn { width: 52px; height: 52px; border-radius: 50%; background: none; border: none; color: #ef4444; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
+.action-btn { width: 38px; height: 38px; border-radius: 50%; background: none; border: none; color: #ef4444; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
 .action-btn:hover { background: #2a2a2a; }
 .action-btn.active { color: #ef4444; }
 .mobile-search-trigger { display: none; flex-shrink: 0; }
@@ -283,8 +353,8 @@ a { text-decoration: none; color: inherit; }
 
 .search-wrap { position: relative; }
 @media (max-width: 640px) { .search-wrap { display: none; } }
-.search-box { display: flex; align-items: center; width: 260px; height: 38px; background: #181818; border: 1px solid #ef4444; border-radius: 40px; overflow: hidden; transition: border-color 0.15s; }
-.search-box.focused { border-color: #666; }
+.search-box { display: flex; align-items: center; width: 260px; height: 38px; background: #181818; border: 1px solid #2a2a2a; border-radius: 40px; overflow: hidden; transition: border-color 0.15s; }
+.search-box.focused { border-color: #ef4444; }
 .search-input { flex: 1; height: 100%; background: none; border: none; outline: none; color: #fff; font-size: 14px; padding: 0 14px; }
 .search-input::placeholder { color: #aaa; }
 .search-btn { width: 42px; height: 100%; background: #2a2a2a; border: none; border-left: 1px solid #333; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
@@ -295,11 +365,12 @@ a { text-decoration: none; color: inherit; }
 .suggestion-row:hover { background: #2d2d2d; }
 .sug-avatar { width: 28px; height: 28px; border-radius: 50%; background: #1a1a1a; border: 0.5px solid #333; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .sug-name { font-size: 14px; color: #fff; }
-.sug-count { font-size: 11px; color: #717171; margin-left: auto; }
+.sug-count { font-size: 11px; color: #a0a0a8; margin-left: auto; }
 
 .lang-wrap { position: relative; }
 .lang-btn { display: flex; align-items: center; gap: 5px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 0 12px; height: 40px; color: #fff; font-size: 28px; cursor: pointer; }
-.lang-dropdown { position: absolute; top: calc(100% + 6px); right: 0; background: #212121; border: 0.5px solid #303030; border-radius: 10px; width: 170px; max-height: 320px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.lang-dropdown { position: absolute; top: calc(100% + 6px); right: 0; background: #212121; border: 0.5px solid #303030; border-radius: 10px; width: 170px; max-height: 320px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.5); scrollbar-width: thin; scrollbar-color: #444 transparent; }
+.lang-dropdown::after { content: ''; position: sticky; bottom: 0; left: 0; right: 0; height: 28px; background: linear-gradient(to bottom, transparent, #212121); display: block; pointer-events: none; border-radius: 0 0 10px 10px; }
 .lang-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; font-size: 13px; color: #fff; transition: background 0.1s; }
 .lang-item:hover { background: #2a2a2a; }
 .lang-item.active { color: #ef4444; background: #2a2a2a; }
@@ -307,26 +378,26 @@ a { text-decoration: none; color: inherit; }
 .mobile-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; }
 .mobile-search-bar { background: #181818; border-bottom: 0.5px solid #333; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
 .mobile-search-input { flex: 1; background: none; border: none; outline: none; color: #fff; font-size: 16px; }
-.mobile-search-input::placeholder { color: #666; }
+.mobile-search-input::placeholder { color: #888; }
 .mobile-close { background: none; border: none; color: #aaa; cursor: pointer; display: flex; align-items: center; padding: 4px; }
 .mobile-search-go { background: #ef4444; border: none; border-radius: 6px; color: #fff; font-size: 14px; font-weight: 600; padding: 8px 16px; cursor: pointer; flex-shrink: 0; }
 
 /* ── NAV ── */
-.nav { background: #0f0f0f; border-bottom: 0.5px solid #222; width: 100%; overflow: hidden; }
+.nav { background: #000000; border-bottom: 0.5px solid #222; width: 100%; overflow: hidden; }
 
 /* Desktop nav */
 .nav-desktop { display: block; scrollbar-width: none; }
 .nav-desktop::-webkit-scrollbar { display: none; }
-.nav-desktop .nav-inner { display: flex; padding-top: 16px; padding-bottom: 16px; padding-left: 24px; padding-right: 24px; gap: 0; overflow-x: auto; scrollbar-width: none; }
+.nav-desktop .nav-inner { display: flex; padding-top: 16px; padding-bottom: 16px; padding-left: 24px; padding-right: 24px; gap: 28px; overflow-x: auto; scrollbar-width: none; }
 .nav-desktop .nav-inner::-webkit-scrollbar { display: none; }
 @media (max-width: 768px) { .nav-desktop { display: none; } }
 
-.nav-big-item { display: flex; flex-direction: column; align-items: center; width: 150px; margin-right: 28px; gap: 8px; flex-shrink: 0; cursor: pointer; border-radius: 10px; transition: background 0.15s; padding: 8px 0; }
+.nav-big-item { display: flex; flex-direction: column; align-items: center; width: 100px; gap: 8px; flex-shrink: 0; cursor: pointer; border-radius: 10px; transition: background 0.15s; padding: 8px 0; }
 .nav-big-item:hover .nav-big-logo { box-shadow: 0 0 0 3px #ef4444; }
 .nav-big-item.active .nav-big-logo { box-shadow: 0 0 0 3px #ef4444; }
 .nav-big-logo { width: 76px; height: 76px; border-radius: 50%; background: #fff; border: 1px solid #e5e5e5; display: flex; align-items: center; justify-content: center; transition: box-shadow 0.2s; overflow: hidden; }
 .nav-big-logo img { width: 54px; height: 54px; object-fit: contain; }
-.nav-big-name { font-size: 14px; font-weight: 600; color: #fff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.nav-big-name { font-size: 12px; font-weight: 600; color: #fff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
 .nav-big-item.active .nav-big-name, .nav-big-item:hover .nav-big-name { color: #fff; font-weight: 700; }
 
 /* Mobile nav */
@@ -334,7 +405,7 @@ a { text-decoration: none; color: inherit; }
 .nav-mobile::-webkit-scrollbar { display: none; }
 @media (max-width: 768px) { .nav-mobile { display: flex; } }
 
-.pill { display: flex; align-items: center; gap: 6px; padding: 6px 12px; height: 38px; border: 1px solid #2a2a2a; border-radius: 99px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.5); white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+.pill { display: flex; align-items: center; gap: 6px; padding: 6px 12px; height: 38px; border: 1px solid #2a2a2a; border-radius: 99px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.75); white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
 .pill:hover { color: #fff; border-color: #444; }
 .pill-active { background: #1a1a1a; border-color: #ef4444 !important; color: #fff !important; }
 .pill-logo { width: 18px; height: 18px; object-fit: contain; background: #fff; border-radius: 50%; }
@@ -354,13 +425,109 @@ a { text-decoration: none; color: inherit; }
 .drawer-item:hover { background: #1f1f1f; }
 .drawer-avatar { width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 0.5px solid #e5e5e5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
 .drawer-avatar img { width: 26px; height: 26px; object-fit: contain; }
-.drawer-avatar span { font-size: 8px; font-weight: 700; color: #fff; }
-.logo-fallback { font-size: 8px; font-weight: 700; color: #fff; }
-.drawer-count { margin-left: auto; font-size: 11px; color: #6b7280; background: #1a1a1a; padding: 1px 7px; border-radius: 99px; }
+.drawer-avatar span { font-size: 8px; font-weight: 700; color: #1a1a1a; }
+.drawer-count { margin-left: auto; font-size: 11px; color: #a0a0b0; background: #1a1a1a; padding: 1px 7px; border-radius: 99px; }
 
-/* ── MAIN / FOOTER ── */
+/* ── MAIN ── */
 .main { flex: 1; }
-.footer { border-top: 0.5px solid #222; padding: 20px 0; text-align: center; font-size: 12px; color: #555; }
+
+/* ── FOOTER ── */
+.footer {
+    background: #050508;
+    border-top: 0.5px solid #1e1e28;
+    margin-top: 48px;
+}
+
+.footer-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.footer-top {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+    gap: 40px;
+    padding: 48px 0 40px;
+    border-bottom: 0.5px solid #1a1a24;
+}
+
+@media (max-width: 1024px) {
+    .footer-top { grid-template-columns: 1fr 1fr; gap: 32px; }
+}
+@media (max-width: 600px) {
+    .footer-top { grid-template-columns: 1fr; gap: 28px; padding: 32px 0 28px; }
+    .footer-inner { padding: 0 16px; }
+}
+
+/* Brand column */
+.footer-brand { display: flex; flex-direction: column; gap: 14px; }
+
+.footer-logo {
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none;
+}
+.footer-logo .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: #e01552; flex-shrink: 0; }
+.footer-logo .logo-text { font-size: 18px; font-weight: 700; color: #fff; }
+
+.footer-tagline {
+    font-size: 13px; color: #666; line-height: 1.5;
+    max-width: 340px;
+}
+
+/* Link columns */
+.footer-col { display: flex; flex-direction: column; gap: 2px; }
+
+.footer-col-title {
+    font-size: 10px; font-weight: 700; color: #e01552;
+    text-transform: uppercase; letter-spacing: .8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1a1a24;
+}
+
+.footer-link {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0; color: #888; font-size: 13px;
+    text-decoration: none; transition: color .12s;
+    white-space: nowrap;
+}
+.footer-link:hover { color: #fff; }
+
+.footer-link-logo {
+    width: 18px; height: 18px; object-fit: contain;
+    background: #fff; border-radius: 50%; flex-shrink: 0;
+    padding: 1px;
+}
+
+.footer-team-avatar {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #1e1e2a; border: 1px solid #2a2a38;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; overflow: hidden;
+}
+.footer-team-avatar img { width: 14px; height: 14px; object-fit: contain; }
+.footer-team-avatar span { font-size: 7px; font-weight: 700; color: #aaa; }
+
+/* Bottom bar */
+.footer-bottom {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+    padding: 20px 0;
+}
+
+.footer-copy { font-size: 12px; color: #444; }
+
+.footer-bottom-links {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+}
+.footer-bottom-lang {
+    background: none; border: none; color: #444; font-size: 11px;
+    cursor: pointer; padding: 2px 4px; transition: color .12s;
+}
+.footer-bottom-lang:hover { color: #888; }
+.footer-bottom-lang.active { color: #e01552; }
+.footer-sep { color: #2a2a2a; font-size: 11px; }
 
 .hide-scroll::-webkit-scrollbar { display: none; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }

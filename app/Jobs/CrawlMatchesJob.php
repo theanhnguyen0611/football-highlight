@@ -2,8 +2,9 @@
 
 namespace App\Jobs;
 
-use App\Models\FootballMatch;
 use App\Services\CrawlService;
+use App\Services\DownloadService;
+use App\Services\HighlightlyService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,31 +16,26 @@ class CrawlMatchesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 300;
-    public int $tries   = 3;
+    public int $timeout = 600;
+    public int $tries   = 1;
 
-    public function handle(CrawlService $crawl): void
+    public function handle(HighlightlyService $highlightly, CrawlService $crawl, DownloadService $download): void
     {
-        Log::info('CrawlMatchesJob: start');
+        Log::info('CrawlMatchesJob: start (cron mode)');
 
-        $slugs = $crawl->fetchSitemapSlugs();
-        $new   = 0;
-
-        foreach ($slugs as $item) {
-            if (FootballMatch::where('slug', $item['slug'])->exists()) {
-                continue;
-            }
-
-            sleep(1);
-            $data = $crawl->crawlMatch($item['url'], $item['slug']);
-            if (!$data) continue;
-
-            $crawl->saveMatch($data);
-            $new++;
-
-            Log::info('CrawlMatchesJob: new match', ['slug' => $item['slug']]);
+        // Sync Highlightly today + yesterday
+        for ($i = 0; $i < 2; $i++) {
+            $date   = now()->subDays($i)->format('Y-m-d');
+            $result = $highlightly->syncDate($date);
+            Log::info("CrawlMatchesJob: syncDate {$date}", $result);
+            if ($i === 0) sleep(1);
         }
 
-        Log::info('CrawlMatchesJob: done', ['new' => $new]);
+        // Hoofoot + DasFootball: mỗi source check độc lập, skip nếu đã có
+        $listings   = $crawl->crawlHoofootRecentSlugs(days: 2);
+        $mapped     = $crawl->findAndMapVideos($listings, limit: 30, tryDasFootball: true);
+        $downloaded = $download->downloadAllPending();
+
+        Log::info('CrawlMatchesJob: done', ['mapped' => $mapped, 'downloaded' => $downloaded]);
     }
 }

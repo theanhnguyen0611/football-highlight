@@ -12,13 +12,15 @@ class FootballMatch extends Model
 
     protected $fillable = [
         'slug', 'home_team_id', 'away_team_id', 'league_id',
-        'home_score', 'away_score', 'match_date', 'kick_off_time',
-        'venue', 'round', 'thumbnail_url', 'status',
-        'highlightly_id',
+        'home_score', 'away_score', 'score_penalties', 'match_date', 'kick_off_time',
+        'venue', 'referee', 'round', 'thumbnail_url', 'status', 'match_status',
+        'highlightly_id', 'statistics', 'details_synced_at',
     ];
 
     protected $casts = [
-        'match_date' => 'date',
+        'match_date'        => 'date',
+        'statistics'        => 'array',
+        'details_synced_at' => 'datetime',
     ];
 
     public function homeTeam(): BelongsTo

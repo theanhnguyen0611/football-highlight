@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VideoController;
 use App\Http\Controllers\Api\Admin\StatsController;
 use App\Http\Controllers\Api\Admin\CrawlController;
+use App\Http\Controllers\Api\Admin\UploadController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -27,4 +28,6 @@ Route::prefix('admin')->middleware('auth.admin')->group(function () {
     Route::post('/crawl', [CrawlController::class, 'crawl']);
     Route::post('/download/{matchId}', [CrawlController::class, 'download']);
     Route::post('/retry-errors', [CrawlController::class, 'retryErrors']);
+    Route::post('/full-match', [UploadController::class, 'store']);
+    Route::get('/full-match/{matchId}', [UploadController::class, 'show']);
 });

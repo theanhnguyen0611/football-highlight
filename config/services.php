@@ -36,8 +36,14 @@ return [
     ],
     
     'api_football' => [
-    'key' => env('API_FOOTBALL_KEY'),
-    'url' => env('API_FOOTBALL_URL', 'https://v3.football.api-sports.io'),
-],
+        'key' => env('API_FOOTBALL_KEY'),
+        'url' => env('API_FOOTBALL_URL', 'https://v3.football.api-sports.io'),
+    ],
+
+    'cdn' => [
+        'url'      => env('CDN_URL'),
+        'sx65_ssh' => env('SX65_SSH'),
+        'sx65_path' => env('SX65_PATH', '/storage/bolareel'),
+    ],
 
 ];

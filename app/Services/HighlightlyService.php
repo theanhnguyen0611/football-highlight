@@ -8,11 +8,42 @@ use App\Models\MatchVideo;
 use App\Models\MatchEvent;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class HighlightlyService
 {
     private string $baseUrl = 'https://soccer.highlightly.net';
+
+    private const TOP_LEAGUE_IDS = [
+        33973, 119924, 67162, 61205, 52695, 2486, 3337,
+        39079, 41632, 122477, 69715, 117371, 56950,
+        1635, 4188, 8443, 5039, 9294, 14400,
+        19506, 75672, 80778, 173537,
+        216087, 34824,
+        262041, // Saudi Pro League
+
+        // World Cup Qualifiers (tất cả châu lục gộp chung)
+        25463, 26314, 27165, 28016, 28867, 29718, 32271,
+    ];
+
+    // WCQ logo: dùng chung logo WCQ Europe (đẹp nhất, phổ biến nhất)
+    private const WCQ_LOGO = 'https://highlightly.net/soccer/images/leagues/28016.png';
+
+    // Các league ID được gộp thành 1 league ảo trong DB
+    private const LEAGUE_GROUP_MAP = [
+        25463 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
+        26314 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
+        27165 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
+        28016 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
+        28867 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
+        29718 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
+        32271 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
+    ];
+
+    // Highlightly gộp giao hữu ĐTQG + CLB chung 1 ID → tách ra theo team type
+    private const FRIENDLIES_HIGHLIGHTLY_ID    = 9294;
+    private const INTL_FRIENDLIES_VIRTUAL_ID   = 9294;   // giữ nguyên highlightly_id cũ
+    private const CLUB_FRIENDLIES_VIRTUAL_ID   = 99998;
+
     private string $apiKey;
 
     public function __construct()
@@ -41,20 +72,16 @@ class HighlightlyService
     // ─── Sync Leagues ────────────────────────────────────────
     public function syncLeagues(): int
     {
-        $res = $this->get('/leagues', ['limit' => 200]);
-        $data = $res['data'] ?? [];
+        $res  = $this->get('/leagues', ['limit' => 200]);
         $count = 0;
 
-        foreach ($data as $l) {
-            $slug = Str::slug($l['name']);
-            $logoPath = $this->downloadMedia($l['logo'] ?? null, "logos/leagues/{$slug}");
-
+        foreach ($res['data'] ?? [] as $l) {
             League::updateOrCreate(
                 ['highlightly_id' => $l['id']],
                 [
                     'name'           => $l['name'],
-                    'slug'           => $slug,
-                    'logo_path'      => $logoPath ?? $l['logo'] ?? null,
+                    'slug'           => Str::slug($l['name']),
+                    'logo_path'      => $l['logo'] ?? null,
                     'country'        => $l['country']['name'] ?? null,
                     'highlightly_id' => $l['id'],
                 ]
@@ -66,112 +93,174 @@ class HighlightlyService
         return $count;
     }
 
-    // ─── Sync Matches by date ─────────────────────────────────
-    public function syncMatches(string $date): int
+    // ─── Sync một ngày: /matches + /highlights trong 1 lần lặp ──
+    // Thay cho syncMatches() + syncHighlights() riêng lẻ.
+    // Hai endpoint trả về cùng league filter nên gọi liên tiếp cho 1 date.
+    public function syncDate(string $date): array
     {
+        $matchCount = 0;
+        $videoCount = 0;
+
+        // Bước A: lấy matches theo ngày — chỉ lưu khi finished + có score
         $res = $this->get('/matches', ['date' => $date, 'limit' => 100]);
-        $data = $res['data'] ?? [];
-        $count = 0;
-
-        foreach ($data as $m) {
-            $this->upsertMatch($m);
-            $count++;
+        foreach ($res['data'] ?? [] as $m) {
+            if (!in_array($m['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
+            if ($this->mapStatus($m['state']['description'] ?? null) !== 'finished') continue;
+            if (($m['homeScore'] ?? null) === null) continue;
+            if ($this->upsertMatch($m)) $matchCount++;
         }
 
-        Log::info("Highlightly: synced {$count} matches for {$date}");
-        return $count;
-    }
+        sleep(1);
 
-    // ─── Sync Highlights by date ──────────────────────────────
-    public function syncHighlights(string $date): int
-    {
+        // Bước B: lấy highlights — upsert match nếu chưa có, cũng chỉ khi finished + có score
         $res = $this->get('/highlights', ['date' => $date, 'limit' => 100]);
-        $data = $res['data'] ?? [];
-        $count = 0;
-
-        foreach ($data as $h) {
-            $matchData = $h['match'] ?? null;
-            if (!$matchData) continue;
-
-            $match = FootballMatch::where('highlightly_id', $matchData['id'])->first();
-            if (!$match) {
-                $match = $this->upsertMatch($matchData);
+        foreach ($res['data'] ?? [] as $h) {
+            $md = $h['match'] ?? null;
+            if (!$md || !in_array($md['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
+            if ($this->mapStatus($md['state']['description'] ?? null) !== 'finished') continue;
+            if (($md['homeScore'] ?? null) === null) continue;
+            if (!FootballMatch::where('highlightly_id', $md['id'])->exists()) {
+                if ($this->upsertMatch($md)) $videoCount++;
             }
-            if (!$match) continue;
-
-            // Download thumbnail nếu có
-            if (!empty($h['imgUrl']) && (!$match->thumbnail_url || str_starts_with($match->thumbnail_url, 'http'))) {
-                $thumbPath = $this->downloadMedia($h['imgUrl'], "thumbnails/{$match->slug}");
-                if ($thumbPath) {
-                    $match->update(['thumbnail_url' => '/storage/' . $thumbPath]);
-                }
-            }
-
-            MatchVideo::updateOrCreate(
-                ['match_id' => $match->id, 'source_url' => $h['url']],
-                [
-                    'source' => $h['source'] ?? 'highlightly',
-                    'status' => 'pending',
-                ]
-            );
-
-            $count++;
         }
 
-        Log::info("Highlightly: synced {$count} highlights for {$date}");
-        return $count;
+        Log::info("Highlightly: syncDate {$date} → {$matchCount} matches, {$videoCount} from highlights");
+        return ['matches' => $matchCount, 'highlights' => $videoCount];
     }
 
-    // ─── Sync Scores from match detail events ────────────────
-    public function syncScores(int $limit = 50): int
+    // ─── Sync venue + events cho finished matches chưa được detail ───
+    // Retry nếu score vẫn NULL dù đã sync (API chậm hơn trận kết thúc).
+    public function syncFinishedMatchDetails(int $limit = 30): int
     {
-        $matches = FootballMatch::whereNull('home_score')
+        $matches = FootballMatch::where('match_status', 'finished')
             ->whereNotNull('highlightly_id')
-            ->latest('match_date')
+            ->where(function ($q) {
+                $q->whereNull('details_synced_at')
+                  ->orWhere(function ($q) {
+                      // Re-sync nếu score vẫn NULL và trận < 7 ngày trước
+                      $q->whereNull('home_score')
+                        ->where('match_date', '>=', now()->subDays(7));
+                  });
+            })
             ->limit($limit)
             ->get();
 
         $count = 0;
-
         foreach ($matches as $match) {
-            $data = $this->get("/matches/{$match->highlightly_id}");
-            if (!$data) continue;
-
-            // API trả về array
-            $detail = is_array($data) && isset($data[0]) ? $data[0] : $data;
-            $events = $detail['events'] ?? [];
-
-            if (empty($events)) continue;
-
-            // Tính score từ goals
-            $homeScore = 0;
-            $awayScore = 0;
-
-            foreach ($events as $event) {
-                if ($event['type'] !== 'Goal') continue;
-                if (($event['detail'] ?? '') === 'Own Goal') {
-                    if ($event['team']['id'] == $match->homeTeam?->highlightly_id) $awayScore++;
-                    else $homeScore++;
-                } else {
-                    if ($event['team']['id'] == $match->homeTeam?->highlightly_id) $homeScore++;
-                    else $awayScore++;
-                }
-            }
-
-            $match->update([
-                'home_score' => $homeScore,
-                'away_score' => $awayScore,
-            ]);
-
-            Log::info("Score synced: {$match->slug} {$homeScore}-{$awayScore}");
-            $count++;
+            $result = $this->syncMatchDetails($match->id, $match->highlightly_id);
+            if ($result['events'] > 0 || $result['venue'] || $result['score']) $count++;
             sleep(1);
         }
 
+        Log::info("Highlightly: synced details for {$count} matches");
         return $count;
     }
 
-    // ─── Private helpers ─────────────────────────────────────
+    // ─── Sync detail một match cụ thể ────────────────────────────
+    public function syncMatchDetails(int $matchId, int $highlightlyMatchId): array
+    {
+        $res    = $this->get("/matches/{$highlightlyMatchId}");
+        $detail = $res[0] ?? null;
+        if (!$detail) return ['venue' => false, 'events' => 0];
+
+        $match = FootballMatch::with(['homeTeam', 'awayTeam'])->find($matchId);
+        if (!$match) return ['venue' => false, 'events' => 0];
+
+        $updates = [];
+        $scoreUpdated = false;
+
+        // Chỉ update field nếu còn trống — không ghi đè data hiện có
+        if (!$match->venue) {
+            $venueName = $detail['venue']['name'] ?? null;
+            if ($venueName) $updates['venue'] = $venueName;
+        }
+
+        if (blank($match->home_score)) {
+            $scoreStr = $detail['state']['score']['current'] ?? null;
+            if ($scoreStr && preg_match('/(\d+)\s*-\s*(\d+)/', $scoreStr, $sm)) {
+                $updates['home_score'] = (int) $sm[1];
+                $updates['away_score'] = (int) $sm[2];
+                $scoreUpdated = true;
+            }
+        } else {
+            $scoreUpdated = true; // score đã có từ trước
+        }
+
+        if (!$match->score_penalties) {
+            $penalties = $detail['state']['score']['penalties'] ?? null;
+            if ($penalties) $updates['score_penalties'] = $penalties;
+        }
+
+        if (!$match->referee) {
+            $refereeName = $detail['referee']['name'] ?? null;
+            if ($refereeName) $updates['referee'] = $refereeName;
+        }
+
+        if (!$match->statistics) {
+            $statistics = $detail['statistics'] ?? null;
+            if ($statistics) $updates['statistics'] = $statistics;
+        }
+
+        // Chỉ đánh dấu synced khi đã có score — tránh lock match khỏi retry
+        if ($scoreUpdated) {
+            $updates['details_synced_at'] = now();
+        }
+
+        if ($updates) $match->update($updates);
+        $venueUpdated = isset($updates['venue']);
+
+        $eventsCount = $this->saveEvents($match, $detail['events'] ?? []);
+
+        return ['venue' => $venueUpdated, 'events' => $eventsCount, 'score' => $scoreUpdated];
+    }
+
+    private const EVENT_TYPE_MAP = [
+        'Goal'            => 'goal',
+        'Own Goal'        => 'own_goal',
+        'Yellow Card'     => 'yellow_card',
+        'Red Card'        => 'red_card',
+        'Yellow Red Card' => 'yellow_red_card',
+        'Substitution'    => 'subst',
+        'Penalty'         => 'penalty',
+    ];
+
+    // ─── Lưu events — bỏ qua nếu đã có (tránh ghi đè fix thủ công) ──
+    private function saveEvents(FootballMatch $match, array $events): int
+    {
+        if (!$events) return 0;
+
+        // Đã có events → giữ nguyên, không ghi đè
+        if ($match->events()->exists()) {
+            return $match->events()->count();
+        }
+
+        $count = 0;
+        foreach ($events as $e) {
+            $apiType = $e['type'] ?? '';
+            $type    = self::EVENT_TYPE_MAP[$apiType] ?? null;
+            if (!$type) continue;
+
+            $teamHighlightlyId = $e['team']['id'] ?? null;
+            $team = $match->homeTeam->highlightly_id == $teamHighlightlyId
+                ? $match->homeTeam
+                : $match->awayTeam;
+
+            MatchEvent::create([
+                'match_id'    => $match->id,
+                'team_id'     => $team->id,
+                'minute'      => (int) ($e['time'] ?? 0),
+                'type'        => $type,
+                'player_name' => $e['player'] ?? '',
+                'assist_name' => $e['assist'] ?? $e['substituted'] ?? null,
+            ]);
+            $count++;
+        }
+
+        Log::info("Highlightly: saved {$count} events for match {$match->id}");
+        return $count;
+    }
+
+    // ─── Private helpers ──────────────────────────────────────
     private function upsertMatch(array $m): ?FootballMatch
     {
         try {
@@ -179,10 +268,22 @@ class HighlightlyService
             $awayTeam = $this->upsertTeam($m['awayTeam'] ?? null);
             if (!$homeTeam || !$awayTeam) return null;
 
-            $league = $this->upsertLeague($m['league'] ?? null);
-
-            $date = substr($m['date'], 0, 10);
-            $slug = Str::slug("{$homeTeam->slug}-vs-{$awayTeam->slug}-{$date}");
+            $leagueData = $m['league'] ?? null;
+            $leagueId   = $leagueData['id'] ?? null;
+            if ($leagueId && isset(self::LEAGUE_GROUP_MAP[$leagueId])) {
+                $leagueData = self::LEAGUE_GROUP_MAP[$leagueId];
+            } elseif ($leagueId === self::FRIENDLIES_HIGHLIGHTLY_ID) {
+                $logo = $leagueData['logo'] ?? null;
+                $isNational = $homeTeam->type === 'national' && $awayTeam->type === 'national';
+                if ($isNational) {
+                    $leagueData = ['id' => self::INTL_FRIENDLIES_VIRTUAL_ID, 'name' => 'International Friendlies', 'logo' => $logo];
+                } else {
+                    $leagueData = ['id' => self::CLUB_FRIENDLIES_VIRTUAL_ID, 'name' => 'Club Friendlies', 'logo' => $logo];
+                }
+            }
+            $league = $this->upsertLeague($leagueData);
+            $date   = substr($m['date'], 0, 10);
+            $slug   = Str::slug("{$homeTeam->slug}-vs-{$awayTeam->slug}-{$date}");
 
             return FootballMatch::updateOrCreate(
                 ['highlightly_id' => $m['id']],
@@ -195,6 +296,7 @@ class HighlightlyService
                     'away_score'     => $m['awayScore'] ?? null,
                     'match_date'     => $date,
                     'round'          => $m['round'] ?? null,
+                    'match_status'   => $this->mapStatus($m['state']['description'] ?? null),
                     'highlightly_id' => $m['id'],
                 ]
             );
@@ -204,24 +306,28 @@ class HighlightlyService
         }
     }
 
+    private function mapStatus(?string $description): string
+    {
+        $live  = ['First Half', 'Second Half', 'Half Time', 'Extra Time', 'Extra Time Half Time', 'Penalty Shootout', 'Break Time'];
+        $ended = ['Finished', 'Finished AET', 'Finished AP', 'Finished After Extra Time', 'Finished After Penalties'];
+
+        if (!$description) return 'scheduled';
+        if (in_array($description, $ended)) return 'finished';
+        if (in_array($description, $live)) return 'live';
+        if ($description === 'Not started') return 'scheduled';
+        return 'other';
+    }
+
     private function upsertTeam(?array $t): ?Team
     {
         if (!$t) return null;
-        $slug     = Str::slug($t['name']);
-        $existing = Team::where('highlightly_id', $t['id'])->first();
-
-        $logoPath = $existing?->logo_path;
-        if (!$logoPath || str_starts_with($logoPath, 'http')) {
-            $logoPath = $this->downloadMedia($t['logo'] ?? null, "logos/teams/{$slug}") ?? $logoPath;
-        }
-
         return Team::updateOrCreate(
             ['highlightly_id' => $t['id']],
             [
                 'name'           => $t['name'],
-                'slug'           => $slug,
+                'slug'           => Str::slug($t['name']),
                 'type'           => Team::guessTypePublic($t['name']),
-                'logo_path'      => $logoPath,
+                'logo_path'      => $t['logo'] ?? null,
                 'highlightly_id' => $t['id'],
             ]
         );
@@ -230,43 +336,14 @@ class HighlightlyService
     private function upsertLeague(?array $l): ?League
     {
         if (!$l) return null;
-        $slug     = Str::slug($l['name']);
-        $existing = League::where('highlightly_id', $l['id'])->first();
-
-        $logoPath = $existing?->logo_path;
-        if (!$logoPath || str_starts_with($logoPath, 'http')) {
-            $logoPath = $this->downloadMedia($l['logo'] ?? null, "logos/leagues/{$slug}") ?? $logoPath;
-        }
-
         return League::updateOrCreate(
             ['highlightly_id' => $l['id']],
             [
                 'name'           => $l['name'],
-                'slug'           => $slug,
-                'logo_path'      => $logoPath,
+                'slug'           => Str::slug($l['name']),
+                'logo_path'      => $l['logo'] ?? null,
                 'highlightly_id' => $l['id'],
             ]
         );
-    }
-
-    private function downloadMedia(?string $url, string $basePath): ?string
-    {
-        if (!$url || !str_starts_with($url, 'http')) return null;
-
-        $ext      = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'png';
-        $localKey = "{$basePath}.{$ext}";
-
-        if (Storage::disk('public')->exists($localKey)) return $localKey;
-
-        $ctx = stream_context_create([
-            'http' => ['timeout' => 15, 'header' => "User-Agent: Mozilla/5.0\r\n"],
-            'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false],
-        ]);
-
-        $data = @file_get_contents($url, false, $ctx);
-        if (!$data) return null;
-
-        Storage::disk('public')->put($localKey, $data);
-        return $localKey;
     }
 }

@@ -1,221 +1,308 @@
 <template>
-    <AppLayout :leagues="[]" :locale="locale">
-        <div class="max-w-7xl mx-auto" style="padding:20px">
-            <div style="display:grid;grid-template-columns:1fr 300px;gap:20px">
+    <Head>
+        <title>{{ seo.title }}</title>
+        <meta name="description" :content="seo.description" />
+        <link rel="canonical" :href="seo.canonical" />
+        <meta property="og:site_name" content="BolaReel" />
+        <meta property="og:locale" :content="seo.ogLocale" />
+        <meta property="og:title" :content="seo.fullTitle" />
+        <meta property="og:description" :content="seo.description" />
+        <meta property="og:url" :content="seo.canonical" />
+        <meta property="og:type" :content="seo.ogType || 'video.other'" />
+        <meta v-if="seo.image" property="og:image" :content="seo.image" />
+        <meta v-if="seo.image" property="og:image:alt" :content="seo.title" />
+        <meta name="twitter:card" content="player" />
+        <meta name="twitter:title" :content="seo.fullTitle" />
+        <meta name="twitter:description" :content="seo.description" />
+        <meta v-if="seo.image" name="twitter:image" :content="seo.image" />
+        <link v-for="alt in seo.alternates" :key="alt.hreflang" rel="alternate" :hreflang="alt.hreflang" :href="alt.href" />
+    </Head>
+    <AppLayout
+        :leagues="leagues"
+        :popular-teams="popular_teams"
+        :current-league="match.league?.slug"
+        :locale="locale"
+    >
+        <div class="match-wrap">
+            <div class="match-layout">
 
-                <!-- Main -->
-                <div>
-                    <!-- Video player -->
-                    <div style="aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;margin-bottom:16px">
-                        <video ref="videoEl" class="w-full h-full" controls />
+                <!-- MAIN COLUMN -->
+                <div class="main-col">
+
+                    <!-- Video Player -->
+                    <div class="player-wrap">
+                        <div v-if="!hasVideo" class="player-placeholder">
+                            <div class="ph-teams">
+                                <div class="ph-logo">
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <span v-else>{{ match.home_team?.initials }}</span>
+                                </div>
+                                <span class="ph-vs">VS</span>
+                                <div class="ph-logo">
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <span v-else>{{ match.away_team?.initials }}</span>
+                                </div>
+                            </div>
+                            <p class="ph-label">{{ t('match.no_video') }}</p>
+                        </div>
+
+                        <div v-show="hasVideo" class="plyr-container">
+                            <video ref="videoEl" playsinline :poster="match.thumbnail_url || undefined"></video>
+                        </div>
+
+                        <!-- Click overlay: toggle play/pause -->
+                        <div v-if="hasVideo" class="player-click-area"
+                            @click="onVideoClick"
+                            @mousemove="onOverlayMouseMove"
+                            @mouseleave="onOverlayMouseLeave"
+                        >
+                            <!-- Nút play mặc định — luôn hiện khi paused -->
+                            <transition name="idle-play">
+                                <div v-if="!isPlaying && !flashVisible" class="center-play-btn">
+                                    <svg viewBox="0 0 24 24">
+                                        <polygon points="6,3 20,12 6,21"/>
+                                    </svg>
+                                </div>
+                            </transition>
+
+                            <!-- Flash icon khi vừa click -->
+                            <transition name="icon-flash">
+                                <div v-if="flashVisible" class="flash-icon">
+                                    <svg v-if="flashIcon === 'pause'" viewBox="0 0 24 24" fill="white">
+                                        <rect x="5" y="3" width="4" height="18" rx="1"/>
+                                        <rect x="15" y="3" width="4" height="18" rx="1"/>
+                                    </svg>
+                                    <svg v-else viewBox="0 0 24 24" fill="white">
+                                        <polygon points="6,3 20,12 6,21"/>
+                                    </svg>
+                                </div>
+                            </transition>
+                        </div>
                     </div>
 
-                    <!-- Match header -->
-                    <div style="background:#111;border:0.5px solid #1f1f1f;border-radius:10px;padding:20px;margin-bottom:16px">
-                        <!-- Competition + date -->
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-                            <div style="display:flex;align-items:center;gap:8px">
-                                <span style="font-size:10px;color:#ef4444;text-transform:uppercase;letter-spacing:1px;font-weight:500">
-                                    {{ match.league }}
-                                </span>
-                                <span v-if="match.round" style="font-size:10px;color:#4b5563">· {{ match.round }}</span>
-                            </div>
-                            <div style="text-align:right">
-                                <div style="font-size:14px;font-weight:500;color:#fff">
-                                    {{ formatTime(match.kick_off_time) }}
-                                </div>
-                                <div style="font-size:11px;color:#6b7280">{{ formatDate(match.match_date) }}</div>
-                            </div>
-                        </div>
-
-                        <!-- Teams + Score -->
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-                            <!-- Home team -->
-                            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:10px">
-                                <div class="team-logo-lg">
-                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" :alt="match.home_team.name" class="w-full h-full object-contain" />
-                                    <span v-else style="font-size:20px;font-weight:700;color:#e5e7eb">{{ match.home_team?.initials }}</span>
-                                </div>
-                                <span style="font-size:16px;font-weight:500;color:#fff;text-align:center">{{ match.home_team?.name }}</span>
-                            </div>
-
-                            <!-- Score center -->
-                            <div style="text-align:center;padding:0 20px">
-                                <div v-if="showScore" style="font-size:42px;font-weight:500;color:#fff;letter-spacing:-2px;line-height:1">
-                                    {{ match.home_score }} – {{ match.away_score }}
-                                </div>
-                                <div v-else style="font-size:18px;color:#374151;margin-bottom:4px">
-                                    <button @click="showScore = true" style="font-size:11px;color:#6b7280;background:#1a1a1a;border:0.5px solid #2a2a2a;padding:6px 14px;border-radius:5px;cursor:pointer">
-                                        Show Score
-                                    </button>
-                                </div>
-                                <div style="font-size:10px;color:#4b5563;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">Full Time</div>
-                            </div>
-
-                            <!-- Away team -->
-                            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:10px">
-                                <div class="team-logo-lg">
-                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" :alt="match.away_team.name" class="w-full h-full object-contain" />
-                                    <span v-else style="font-size:20px;font-weight:700;color:#e5e7eb">{{ match.away_team?.initials }}</span>
-                                </div>
-                                <span style="font-size:16px;font-weight:500;color:#fff;text-align:center">{{ match.away_team?.name }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Venue + Referee -->
-                        <div v-if="match.venue || match.referee" style="display:flex;gap:16px;padding-top:14px;border-top:0.5px solid #1a1a1a">
-                            <span v-if="match.venue" style="font-size:11px;color:#4b5563;display:flex;align-items:center;gap:5px">
-                                📍 {{ match.venue }}
-                            </span>
-                            <span v-if="match.referee" style="font-size:11px;color:#4b5563;display:flex;align-items:center;gap:5px">
-                                👤 {{ match.referee }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Tabs: Events / Lineup / Stats / Players -->
-                    <div style="display:flex;gap:2px;margin-bottom:16px;background:#111;border-radius:8px;padding:4px">
+                    <!-- Source selector -->
+                    <div v-if="playableVideos.length > 0" class="src-bar">
                         <button
-                            v-for="tab in tabs"
-                            :key="tab.key"
+                            v-for="v in highlightVideos" :key="v.id"
+                            class="src-btn"
+                            :class="{ active: activeVideoIdx === videoIndexMap.get(v.id) }"
+                            @click="switchVideo(videoIndexMap.get(v.id))"
+                        >
+                            <span class="src-dot hl-dot"></span>
+                            {{ highlightLabel(v) }}
+                            <span v-if="v.duration_seconds" class="src-dur">{{ fmtDuration(v.duration_seconds) }}</span>
+                        </button>
+                        <button
+                            v-for="v in fullMatchVideos" :key="v.id"
+                            class="src-btn fm-btn"
+                            :class="{ active: activeVideoIdx === videoIndexMap.get(v.id) }"
+                            @click="switchVideo(videoIndexMap.get(v.id))"
+                        >
+                            <span class="src-dot fm-dot"></span>
+                            {{ t('match.video_full_match') }}
+                            <span v-if="v.duration_seconds" class="src-dur">{{ fmtDuration(v.duration_seconds) }}</span>
+                        </button>
+                    </div>
+
+                    <!-- Match Info Card -->
+                    <div class="info-card">
+                        <div class="info-top">
+                            <div class="info-league">
+                                <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-logo" />
+                                <span class="lg-name">{{ leagueName(match.league) }}</span>
+                                <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
+                            </div>
+                            <div class="info-date">
+                                <span>{{ formatDate(match.match_date) }}</span>
+                            </div>
+                        </div>
+
+                        <div class="teams-row">
+                            <Link class="team-col" :href="localePath(`/team/${match.home_team?.slug}`)">
+                                <div class="team-logo">
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <span v-else>{{ match.home_team?.initials }}</span>
+                                </div>
+                                <span class="team-name">{{ teamName(match.home_team) }}</span>
+                            </Link>
+
+                            <div class="score-col">
+                                <div v-if="scoreVisible" class="score-nums">
+                                    <span>{{ match.home_score ?? '?' }}</span>
+                                    <span class="score-dash">–</span>
+                                    <span>{{ match.away_score ?? '?' }}</span>
+                                </div>
+                                <button v-else class="show-score-btn" @click="scoreVisible = true">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    {{ t('match.show_score') }}
+                                </button>
+                                <span class="ft-label">{{ t('match.full_time') }}</span>
+                                <span v-if="scoreVisible && match.score_penalties" class="pen-label">
+                                    (Pen: {{ match.score_penalties }})
+                                </span>
+                            </div>
+
+                            <Link class="team-col" :href="localePath(`/team/${match.away_team?.slug}`)">
+                                <div class="team-logo">
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <span v-else>{{ match.away_team?.initials }}</span>
+                                </div>
+                                <span class="team-name">{{ teamName(match.away_team) }}</span>
+                            </Link>
+                        </div>
+
+                        <div class="meta-row">
+                            <div v-if="match.venue" class="meta-item">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                {{ match.venue }}
+                            </div>
+                            <div v-if="match.referee" class="meta-item">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                                {{ match.referee }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs-bar">
+                        <button v-for="tab in tabs" :key="tab.key"
+                            class="tab-btn" :class="{ active: activeTab === tab.key }"
                             @click="activeTab = tab.key"
-                            :class="['tab-btn', activeTab === tab.key ? 'active' : '']"
                         >{{ tab.label }}</button>
                     </div>
 
-                    <!-- Events tab -->
-                    <div v-if="activeTab === 'events'" style="background:#111;border:0.5px solid #1f1f1f;border-radius:10px;padding:16px">
-                        <div v-if="!match.events?.length" style="color:#4b5563;font-size:13px;text-align:center;padding:20px">
-                            No events data
+                    <!-- Events Tab -->
+                    <div v-if="activeTab === 'events'" class="tab-panel">
+                        <!-- Spoiler lock -->
+                        <div v-if="!scoreVisible" class="spoiler-lock">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <p>{{ t('match.reveal_hint') }}</p>
+                            <button class="show-score-btn" @click="scoreVisible = true">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                {{ t('match.show_score_events') }}
+                            </button>
                         </div>
-                        <div v-for="event in match.events" :key="event.id" class="event-row">
-                            <span class="event-min">{{ event.minute }}'</span>
-                            <span class="event-icon">
-                                {{ event.type === 'goal' ? '⚽' : event.type === 'card' ? (event.detail?.includes('Yellow') ? '🟨' : '🟥') : '🔄' }}
-                            </span>
-                            <span class="event-player">{{ event.player }}</span>
-                            <span v-if="event.assist" class="event-assist">({{ event.assist }})</span>
-                            <span class="event-team-badge" :class="event.team_id === match.home_team?.id ? 'home' : 'away'">
-                                {{ event.team_id === match.home_team?.id ? match.home_team?.initials : match.away_team?.initials }}
-                            </span>
-                        </div>
-                    </div>
 
-                    <!-- Lineup tab -->
-                    <div v-if="activeTab === 'lineup'" style="background:#111;border:0.5px solid #1f1f1f;border-radius:10px;padding:16px">
-                        <div v-if="!match.lineups?.length" style="color:#4b5563;font-size:13px;text-align:center;padding:20px">
-                            No lineup data
-                        </div>
-                        <div v-else style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-                            <div v-for="lineup in match.lineups" :key="lineup.id">
-                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                                    <span style="font-size:13px;font-weight:500;color:#fff">
-                                        {{ lineup.team_id === match.home_team?.id ? match.home_team?.name : match.away_team?.name }}
-                                    </span>
-                                    <span style="font-size:11px;color:#6b7280;background:#1a1a1a;padding:3px 8px;border-radius:4px">
-                                        {{ lineup.formation }}
-                                    </span>
-                                </div>
-                                <div v-for="player in lineup.starters" :key="player.number" class="player-row">
-                                    <span class="player-num">{{ player.number }}</span>
-                                    <span class="player-pos">{{ player.position }}</span>
-                                    <span class="player-name">{{ player.name }} {{ player.is_captain ? '(C)' : '' }}</span>
-                                    <span v-if="getPlayerRating(lineup.team_id, player.name)" class="player-rating" :class="ratingClass(getPlayerRating(lineup.team_id, player.name))">
-                                        {{ getPlayerRating(lineup.team_id, player.name) }}
-                                    </span>
-                                </div>
-                                <div v-if="lineup.substitutes?.length" style="margin-top:10px">
-                                    <div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-top:8px;border-top:0.5px solid #1a1a1a">
-                                        Substitutes
-                                    </div>
-                                    <div v-for="player in lineup.substitutes" :key="player.number" class="player-row sub">
-                                        <span class="player-num">{{ player.number }}</span>
-                                        <span class="player-pos">{{ player.position }}</span>
-                                        <span class="player-name">{{ player.name }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Stats tab -->
-                    <div v-if="activeTab === 'stats'" style="background:#111;border:0.5px solid #1f1f1f;border-radius:10px;padding:16px">
-                        <div v-if="!match.statistics?.length" style="color:#4b5563;font-size:13px;text-align:center;padding:20px">
-                            No statistics data
-                        </div>
                         <template v-else>
-                            <div v-for="(stat, key) in mergedStats" :key="key" class="stat-row">
-                                <span class="stat-val home">{{ stat.home ?? 0 }}</span>
-                                <div class="stat-bars">
-                                    <div class="stat-bar-wrap home">
-                                        <div class="stat-bar-fill" style="background:#ef4444" :style="{ width: statPercent(stat.home, stat.away) + '%' }"></div>
-                                    </div>
-                                    <span class="stat-label">{{ formatStatKey(key) }}</span>
-                                    <div class="stat-bar-wrap away">
-                                        <div class="stat-bar-fill" style="background:#3b82f6" :style="{ width: statPercent(stat.away, stat.home) + '%' }"></div>
-                                    </div>
+                            <div v-if="!match.events?.length" class="empty-tab">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                {{ t('match.no_events') }}
+                            </div>
+                            <div v-for="event in match.events" :key="event.id" class="event-row">
+                                <!-- Home side -->
+                                <div class="event-side event-home">
+                                    <template v-if="event.team_id === match.home_team?.id">
+                                        <div class="event-info">
+                                            <span class="event-player">
+                                                <span v-if="event.type === 'subst'" class="subst-out">↓</span> {{ event.player_name }}
+                                            </span>
+                                            <span v-if="event.assist_name && event.type === 'subst'" class="event-assist"><span class="subst-in">↑</span> {{ event.assist_name }}</span>
+                                            <span v-else-if="event.assist_name" class="event-assist">↳ {{ event.assist_name }}</span>
+                                        </div>
+                                        <span class="event-icon">{{ eventIcon(event) }}</span>
+                                    </template>
                                 </div>
-                                <span class="stat-val away">{{ stat.away ?? 0 }}</span>
+
+                                <!-- Minute (center) -->
+                                <span class="event-min">{{ event.minute }}<span v-if="event.extra_minute">+{{ event.extra_minute }}</span>'</span>
+
+                                <!-- Away side -->
+                                <div class="event-side event-away">
+                                    <template v-if="event.team_id !== match.home_team?.id">
+                                        <span class="event-icon">{{ eventIcon(event) }}</span>
+                                        <div class="event-info">
+                                            <span class="event-player">
+                                                <span v-if="event.type === 'subst'" class="subst-out">↓</span> {{ event.player_name }}
+                                            </span>
+                                            <span v-if="event.assist_name && event.type === 'subst'" class="event-assist"><span class="subst-in">↑</span> {{ event.assist_name }}</span>
+                                            <span v-else-if="event.assist_name" class="event-assist">↳ {{ event.assist_name }}</span>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </template>
                     </div>
 
-                    <!-- Players tab -->
-                    <div v-if="activeTab === 'players'" style="background:#111;border:0.5px solid #1f1f1f;border-radius:10px;padding:16px">
-                        <div v-if="!match.player_stats?.length" style="color:#4b5563;font-size:13px;text-align:center;padding:20px">
-                            No player stats data
-                        </div>
-                        <div v-else style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-                            <div v-for="teamGroup in groupedPlayers" :key="teamGroup.team_id">
-                                <div style="font-size:12px;font-weight:500;color:#fff;margin-bottom:8px;padding-bottom:6px;border-bottom:0.5px solid #1a1a1a">
-                                    {{ teamGroup.team_name }}
-                                </div>
-                                <div v-for="p in teamGroup.players" :key="p.id" class="player-row">
-                                    <span class="player-name flex-1">{{ p.name }}</span>
-                                    <span style="font-size:10px;color:#4b5563;margin-right:4px">
-                                        {{ p.goals > 0 ? `⚽${p.goals}` : '' }}{{ p.assists > 0 ? ` 🅰️${p.assists}` : '' }}
-                                    </span>
-                                    <span v-if="p.rating" class="player-rating" :class="ratingClass(p.rating)">
-                                        {{ p.rating }}
-                                    </span>
+                    <!-- Stats Tab -->
+                    <div v-if="activeTab === 'stats'" class="tab-panel stats-panel">
+                        <div v-if="!statsGroups.length" class="empty-tab">{{ t('ui.no_stats') }}</div>
+                        <template v-else>
+                            <!-- Team legend -->
+                            <div class="stats-legend">
+                                <span class="legend-team">
+                                    <span class="legend-dot home-dot"></span>
+                                    {{ teamName(match.home_team) }}
+                                </span>
+                                <span class="legend-team away">
+                                    {{ teamName(match.away_team) }}
+                                    <span class="legend-dot away-dot"></span>
+                                </span>
+                            </div>
+
+                            <!-- Top 3 donuts -->
+                            <div class="donuts-row">
+                                <div v-for="d in topDonuts" :key="d.key" class="donut-item">
+                                    <div class="donut-vals">
+                                        <span class="donut-val home" :class="{ winner: d.homePct > 50 }">{{ d.home }}</span>
+                                        <div class="donut-ring" :style="{
+                                            background: `conic-gradient(from 180deg, #e01552 0% ${Math.max(2, Math.min(98, d.homePct))}%, #3b82f6 ${Math.max(2, Math.min(98, d.homePct))}% 100%)`
+                                        }"><div class="donut-hole"></div></div>
+                                        <span class="donut-val away" :class="{ winner: d.homePct < 50 }">{{ d.away }}</span>
+                                    </div>
+                                    <div class="donut-label">{{ d.label }}</div>
                                 </div>
                             </div>
-                        </div>
+
+                            <!-- Grouped stats -->
+                            <div v-for="group in statsGroups" :key="group.label" class="stat-group">
+                                <div class="stat-group-label">{{ group.label }}</div>
+
+<div v-for="row in group.rows" :key="row.name" class="stat-row">
+                                    <span class="stat-val" :class="{ winner: row.homeWins }">{{ row.home }}</span>
+                                    <div class="stat-mid">
+                                        <div class="stat-name">{{ row.name }}</div>
+                                        <div class="stat-bar">
+                                            <div class="stat-fill-home" :style="{ width: row.homePct + '%' }"></div>
+                                            <div class="stat-fill-away" :style="{ width: row.awayPct + '%' }"></div>
+                                        </div>
+                                    </div>
+                                    <span class="stat-val away" :class="{ winner: row.awayWins }">{{ row.away }}</span>
+                                </div>
+                            </div>
+                        </template>
                     </div>
+
                 </div>
 
-                <!-- Sidebar: related matches -->
-                <div>
-                    <div class="sec-label" style="margin-bottom:12px">More Highlights</div>
-                    <div style="display:flex;flex-direction:column;gap:10px">
-                        <Link
-                            v-for="m in related"
-                            :key="m.id"
-                            :href="`/match/${m.slug}`"
+                <!-- SIDEBAR -->
+                <aside class="sidebar">
+                    <h3 class="sidebar-title">{{ t('match.more') }}</h3>
+                    <div v-if="!related.length" class="empty-tab" style="padding:20px 0">{{ t('match.no_related') }}</div>
+                    <div class="related-list">
+                        <Link v-for="m in related" :key="m.id"
+                            :href="localePath(`/match/${m.slug}`)"
                             class="related-card"
                         >
-                            <div class="related-thumb" :style="relatedThumbBg(m)">
-                                <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:8px">
+                            <div class="rel-thumb" :style="relatedBg(m)">
+                                <div class="rel-teams">
                                     <div class="rel-logo">
-                                        <img v-if="m.home_team?.logo_url" :src="m.home_team.logo_url" style="width:20px;height:20px;object-fit:contain" />
-                                        <span v-else style="font-size:9px;color:#e5e7eb">{{ m.home_team?.initials }}</span>
+                                        <img v-if="m.home_team?.logo_url" :src="m.home_team.logo_url" />
+                                        <span v-else>{{ m.home_team?.initials }}</span>
                                     </div>
-                                    <span style="font-size:10px;color:#4b5563">vs</span>
+                                    <span class="rel-vs">vs</span>
                                     <div class="rel-logo">
-                                        <img v-if="m.away_team?.logo_url" :src="m.away_team.logo_url" style="width:20px;height:20px;object-fit:contain" />
-                                        <span v-else style="font-size:9px;color:#e5e7eb">{{ m.away_team?.initials }}</span>
+                                        <img v-if="m.away_team?.logo_url" :src="m.away_team.logo_url" />
+                                        <span v-else>{{ m.away_team?.initials }}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div style="padding:6px 8px">
-                                <div style="font-size:11px;font-weight:500;color:#e5e7eb;line-height:1.3">
-                                    {{ m.home_team?.name }} vs {{ m.away_team?.name }}
-                                </div>
-                                <div style="font-size:10px;color:#4b5563;margin-top:2px">{{ formatDate(m.match_date) }}</div>
+                            <div class="rel-info">
+                                <p class="rel-title">{{ teamName(m.home_team) }} vs {{ teamName(m.away_team) }}</p>
+                                <span class="rel-date">{{ formatDate(m.match_date) }}</span>
                             </div>
                         </Link>
                     </div>
-                </div>
+                </aside>
 
             </div>
         </div>
@@ -224,205 +311,773 @@
 
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { Link } from '@inertiajs/vue3'
-import { ref, computed, onMounted } from 'vue'
+import { Head, Link } from '@inertiajs/vue3'
+import { ref, computed, toRef, onMounted, onUnmounted } from 'vue'
+import Plyr from 'plyr'
+import 'plyr/dist/plyr.css'
 import Hls from 'hls.js'
+import { useLocale } from '@/composables/useLocale'
+import { useSeo, injectJsonLd } from '@/composables/useSeo'
 
 const props = defineProps({
-    match:   Object,
-    related: Array,
-    locale:  String,
+    match:         Object,
+    related:       { type: Array, default: () => [] },
+    leagues:       { type: Array, default: () => [] },
+    popular_teams: { type: Array, default: () => [] },
+    locale:        { type: String, default: 'en' },
 })
 
-const videoEl   = ref(null)
-const showScore = ref(false)
-const activeTab = ref('events')
+const { teamName, leagueName, localePath, t, formatDate, formatRound } = useLocale(toRef(props, 'locale'))
+const { matchSeo } = useSeo(toRef(props, 'locale'))
+const seo = computed(() => matchSeo(props.match))
+injectJsonLd(computed(() => seo.value.jsonLd))
 
-const tabs = [
-    { key: 'events',  label: 'Events' },
-    { key: 'lineup',  label: 'Lineup' },
-    { key: 'stats',   label: 'Statistics' },
-    { key: 'players', label: 'Players' },
+const videoEl        = ref(null)
+const scoreVisible   = ref(false)
+const activeTab      = ref('events')
+const activeVideoIdx = ref(0)
+const isPlaying      = ref(false)
+const flashVisible   = ref(false)
+const flashIcon      = ref('play') // 'play' | 'pause'
+let flashTimer = null
+
+let plyrInstance = null
+let hlsInstance  = null
+
+const STAT_GROUPS = [
+    { labelKey: 'stats.key',        keys: ['Expected Goals', 'Big Chances Created'] },
+    { labelKey: 'stats.attack',     keys: ['Shots on target', 'Shots off target', 'Blocked shots', 'Corners', 'Shots within penalty area'] },
+    { labelKey: 'stats.passes',     keys: ['Total passes', 'Successful passes', 'Key Passes'] },
+    { labelKey: 'stats.defence',    keys: ['Successful Tackles', 'Interceptions', 'Clearances', 'Goalkeeper saves'] },
+    { labelKey: 'stats.discipline', keys: ['Fouls', 'Yellow cards', 'Red cards'] },
 ]
 
-// Load HLS video
-async function loadVideo(video) {
-    const res  = await fetch(`/api/videos/${video.id}/stream`)
-    const data = await res.json()
-    if (data.stream_url) playHls(data.stream_url)
+const STAT_NAME_KEYS = {
+    'Expected Goals':              'stat.expected_goals',
+    'Big Chances Created':         'stat.big_chances_created',
+    'Shots on target':             'stat.shots_on_target',
+    'Shots off target':            'stat.shots_off_target',
+    'Blocked shots':               'stat.blocked_shots',
+    'Corners':                     'stat.corners',
+    'Shots within penalty area':   'stat.shots_in_box',
+    'Total passes':                'stat.total_passes',
+    'Successful passes':           'stat.successful_passes',
+    'Key Passes':                  'stat.key_passes',
+    'Successful Tackles':          'stat.successful_tackles',
+    'Interceptions':               'stat.interceptions',
+    'Clearances':                  'stat.clearances',
+    'Goalkeeper saves':            'stat.goalkeeper_saves',
+    'Fouls':                       'stat.fouls',
+    'Yellow cards':                'stat.yellow_cards',
+    'Red cards':                   'stat.red_cards',
 }
 
-function playHls(url) {
-    const el = videoEl.value
-    if (!el) return
-    if (Hls.isSupported()) {
-        const hls = new Hls()
-        hls.loadSource(url)
-        hls.attachMedia(el)
-        hls.on(Hls.Events.MANIFEST_PARSED, () => el.play())
-    } else if (el.canPlayType('application/vnd.apple.mpegurl')) {
-        el.src = url
-        el.play()
+const tabs = computed(() => {
+    const tabList = [{ key: 'events', label: t('match.events') }]
+    if (statsGroups.value.length) tabList.push({ key: 'stats', label: t('match.statistics') })
+    return tabList
+})
+
+const statsData = computed(() => {
+    const raw = props.match.statistics
+    if (!raw?.length) return null
+    const homeId = props.match.home_team?.highlightly_id
+    const homeData = raw.find(s => s.team.id === homeId) ?? raw[0]
+    const awayData = raw.find(s => s.team.id !== homeId) ?? raw[1]
+    const toMap = arr => Object.fromEntries((arr ?? []).map(s => [s.displayName, s.value]))
+    return { home: toMap(homeData?.statistics), away: toMap(awayData?.statistics) }
+})
+
+const homePossession = computed(() =>
+    Math.round((statsData.value?.home['Possession'] ?? 0.5) * 100)
+)
+const awayPossession = computed(() => 100 - homePossession.value)
+
+const topDonuts = computed(() => {
+    if (!statsData.value) return []
+    const { home, away } = statsData.value
+    const result = []
+
+    const xgH = home['Expected Goals'], xgA = away['Expected Goals']
+    if (xgH != null || xgA != null) {
+        const h = xgH ?? 0, a = xgA ?? 0
+        const pct = Math.round((h / (h + a || 1)) * 100)
+        result.push({ key: 'xg', label: t('stat.expected_goals'), home: parseFloat(h.toFixed(2)), away: parseFloat(a.toFixed(2)), homePct: pct })
     }
-}
 
-// Stats helpers
-const mergedStats = computed(() => {
-    if (!props.match.statistics?.length) return {}
-    const home = props.match.statistics.find(s => s.team_id === props.match.home_team?.id)
-    const away = props.match.statistics.find(s => s.team_id === props.match.away_team?.id)
-    const result = {}
-    const allKeys = new Set([...Object.keys(home?.stats || {}), ...Object.keys(away?.stats || {})])
-    allKeys.forEach(key => {
-        result[key] = { home: home?.stats[key] ?? 0, away: away?.stats[key] ?? 0 }
-    })
+    const hPct = homePossession.value
+    result.push({ key: 'poss', label: t('ui.ball_possession'), home: `${hPct}%`, away: `${awayPossession.value}%`, homePct: hPct })
+
+    const sotH = home['Shots on target'], sotA = away['Shots on target']
+    if (sotH != null || sotA != null) {
+        const h = sotH ?? 0, a = sotA ?? 0
+        const pct = Math.round((h / (h + a || 1)) * 100)
+        result.push({ key: 'sot', label: t('stat.shots_on_target'), home: h, away: a, homePct: pct })
+    }
+
     return result
 })
 
-function statPercent(val, other) {
-    const v = parseInt(val) || 0
-    const o = parseInt(other) || 0
-    if (v + o === 0) return 50
-    return Math.round((v / (v + o)) * 100)
-}
+const statsGroups = computed(() => {
+    if (!statsData.value) return []
+    const { home, away } = statsData.value
+    const fmt = v => Number.isInteger(v) ? v : parseFloat(v.toFixed(2))
 
-function formatStatKey(key) {
-    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-}
-
-// Player helpers
-const groupedPlayers = computed(() => {
-    if (!props.match.player_stats?.length) return []
-    const groups = {}
-    props.match.player_stats.forEach(p => {
-        if (!groups[p.team_id]) {
-            groups[p.team_id] = {
-                team_id:   p.team_id,
-                team_name: p.team_id === props.match.home_team?.id
-                    ? props.match.home_team?.name
-                    : props.match.away_team?.name,
-                players: [],
+    return STAT_GROUPS.map(group => ({
+        label: t(group.labelKey),
+        rows: group.keys.map(key => {
+            const h = home[key] ?? 0
+            const a = away[key] ?? 0
+            const total = h + a || 1
+            return {
+                name: STAT_NAME_KEYS[key] ? t(STAT_NAME_KEYS[key]) : key,
+                home: fmt(h),
+                away: fmt(a),
+                homePct: (h / total) * 100,
+                awayPct: (a / total) * 100,
+                homeWins: h > a,
+                awayWins: a > h,
             }
-        }
-        groups[p.team_id].players.push(p)
-    })
-    Object.values(groups).forEach(g => {
-        g.players.sort((a, b) => (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0))
-    })
-    return Object.values(groups)
+        }).filter(r => r.home > 0 || r.away > 0)
+    })).filter(g => g.rows.length)
 })
 
-function getPlayerRating(teamId, playerName) {
-    return props.match.player_stats?.find(p =>
-        p.team_id === teamId && p.name === playerName
-    )?.rating ?? null
+const playableVideos = computed(() => {
+    const ready = props.match.videos?.filter(v => v.status === 'ready' && v.stream_url) ?? []
+    const hasHoofoot = ready.some(v => v.source === 'hoofoot')
+    // DasFootball chỉ hiện nếu không có Hoofoot (backup)
+    return hasHoofoot ? ready.filter(v => v.source !== 'dasfootball') : ready
+})
+
+const highlightVideos = computed(() =>
+    playableVideos.value.filter(v => v.video_type !== 'full_match')
+)
+
+const fullMatchVideos = computed(() =>
+    playableVideos.value.filter(v => v.video_type === 'full_match')
+)
+
+const hasVideo = computed(() => playableVideos.value.length > 0)
+
+const videoIndexMap = computed(() => {
+    const map = new Map()
+    playableVideos.value.forEach((v, i) => map.set(v.id, i))
+    return map
+})
+
+// ── Video ──────────────────────────────────────────
+function loadVideo(video) {
+    if (video.stream_url) playHls(video.stream_url)
+    else tryNextVideo()
 }
 
-function ratingClass(rating) {
-    const r = parseFloat(rating)
-    if (r >= 8)   return 'rating-high'
-    if (r >= 6.5) return 'rating-mid'
-    return 'rating-low'
+function tryNextVideo() {
+    const next = activeVideoIdx.value + 1
+    if (next < playableVideos.value.length) {
+        activeVideoIdx.value = next
+        loadVideo(playableVideos.value[next])
+    }
 }
 
-function formatDate(date) {
-    if (!date) return ''
-    return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+function playHls(url) {
+    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null }
+    const media = plyrInstance?.media ?? videoEl.value
+    if (!media) return
+
+    if (Hls.isSupported()) {
+        hlsInstance = new Hls({
+            enableWorker: true,
+            maxBufferLength: 30,        // tối đa 30s buffer phía trước
+            maxMaxBufferLength: 30,     // không tự tăng lên hơn 30s
+            maxBufferSize: 20 * 1000 * 1000, // 20MB
+            backBufferLength: 0,        // không giữ buffer phía sau
+        })
+
+        hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+            console.error('[hls] error', data.type, data.details, data)
+            if (data.fatal) {
+                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hlsInstance.startLoad()
+                else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hlsInstance.recoverMediaError()
+                else { hlsInstance.destroy(); tryNextVideo() }
+            }
+        })
+
+        hlsInstance.loadSource(url)
+        hlsInstance.attachMedia(media)
+    } else if (media.canPlayType('application/vnd.apple.mpegurl')) {
+        media.src = url
+    }
 }
 
-function formatTime(time) {
-    if (!time) return ''
-    return time.substring(0, 5)
+function switchVideo(idx) {
+    activeVideoIdx.value = idx
+    loadVideo(playableVideos.value[idx])
 }
 
-function relatedThumbBg(m) {
-    const h = m.home_team?.primary_color || '#1a1a1a'
-    const a = m.away_team?.primary_color || '#1a1a1a'
-    return { background: `linear-gradient(135deg, ${h}33 0%, #0a0a0a 50%, ${a}33 100%)` }
+function onOverlayMouseMove() {
+    plyrInstance?.elements?.container?.dispatchEvent(new MouseEvent('mousemove', { bubbles: false }))
 }
 
+function onOverlayMouseLeave() {
+    plyrInstance?.elements?.container?.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }))
+}
+
+function onVideoClick() {
+    flashIcon.value = isPlaying.value ? 'pause' : 'play'
+    plyrInstance?.togglePlay()
+    clearTimeout(flashTimer)
+    flashVisible.value = true
+    flashTimer = setTimeout(() => { flashVisible.value = false }, 600)
+}
+
+// ── Events ─────────────────────────────────────────
+function eventIcon(event) {
+    switch (event.type) {
+        case 'goal':             return '⚽'
+        case 'own_goal':         return '⚽'
+        case 'yellow_card':      return '🟨'
+        case 'red_card':         return '🟥'
+        case 'yellow_red_card':  return '🟨🟥'
+        case 'subst':            return '🔄'
+        case 'penalty':          return '🥅'
+        default:                 return '•'
+    }
+}
+
+// ── Utils ──────────────────────────────────────────
+function highlightLabel(video) {
+    if (video.source === 'hoofoot') return t('match.video_extended')
+    if (video.source === 'dasfootball') return t('match.video_alt')
+    return t('match.video_highlight')
+}
+
+function fmtDuration(secs) {
+    if (!secs) return ''
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    const s = secs % 60
+    if (h) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+    return `${m}:${String(s).padStart(2,'0')}`
+}
+
+function formatTime(time) { return time ? time.substring(0, 5) : '' }
+
+function relatedBg(m) {
+    const c = m.league?.primary_color || '#1a1a24'
+    return { background: `linear-gradient(135deg, ${c}55 0%, #0b0b10 60%, ${c}22 100%)` }
+}
+
+// ── Lifecycle ──────────────────────────────────────
 onMounted(() => {
-    const readyVideo = props.match.videos?.find(v => v.status === 'ready')
-    if (readyVideo) loadVideo(readyVideo)
+    plyrInstance = new Plyr(videoEl.value, {
+        controls: ['play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
+        settings: ['speed'],
+        speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+        seekTime: 10,
+        resetOnEnd: false,
+        invertTime: false,
+        tooltips: { controls: true, seek: true },
+        youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 },
+    })
+
+    plyrInstance.on('play',  () => { isPlaying.value = true })
+    plyrInstance.on('pause', () => { isPlaying.value = false })
+    plyrInstance.on('ended', () => { isPlaying.value = false })
+
+    if (playableVideos.value.length > 0) loadVideo(playableVideos.value[0])
+})
+
+onUnmounted(() => {
+    hlsInstance?.destroy()
+    plyrInstance?.destroy()
 })
 </script>
 
+<style>
+/* Plyr theme override — global (not scoped) */
+:root {
+    --plyr-color-main: #e01552;
+    --plyr-video-background: #000;
+    --plyr-font-family: system-ui, -apple-system, sans-serif;
+    --plyr-range-fill-background: #e01552;
+}
+/* Plyr fill container */
+.plyr-container .plyr,
+.plyr-container .plyr__video-wrapper,
+.plyr-container .plyr video {
+    height: 100% !important;
+    width: 100% !important;
+}
+
+/* Two-row controls: progress bar on top, buttons below */
+.plyr__controls {
+    flex-wrap: wrap !important;
+    padding: 0 8px 8px !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+.plyr__controls .plyr__progress__container {
+    order: -1 !important;
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    padding: 8px 0 4px !important;
+    margin: 0 !important;
+}
+.plyr__controls .plyr__progress {
+    width: 100% !important;
+    margin: 0 !important;
+}
+
+/* Gom nút trái sát nhau, đẩy phần phải sang mép */
+.plyr__controls [data-plyr="play"],
+.plyr__controls [data-plyr="rewind"],
+.plyr__controls [data-plyr="fast-forward"] {
+    margin-right: 0 !important;
+    flex-shrink: 0;
+}
+/* current-time đẩy các nút còn lại sang phải */
+.plyr__controls .plyr__time--current {
+    margin-right: auto !important;
+    padding-left: 4px;
+}
+</style>
+
 <style scoped>
-.team-logo-lg {
-    width: 80px; height: 80px; border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(0,0,0,0.4);
-    display: flex; align-items: center; justify-content: center;
-}
+* { box-sizing: border-box; }
+a { text-decoration: none; color: inherit; }
 
-.tab-btn {
-    flex: 1; padding: 7px; font-size: 12px;
-    color: #6b7280; background: transparent;
-    border: none; border-radius: 6px; cursor: pointer;
-    transition: all 0.15s;
+.match-wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 28px 40px;
+    min-height: 100%;
 }
-.tab-btn.active { background: #1a1a1a; color: #fff; }
-.tab-btn:hover:not(.active) { color: #e5e7eb; }
+@media (max-width: 768px) { .match-wrap { padding: 16px 16px 32px; } }
 
-.event-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 0; border-bottom: 0.5px solid #161616;
+/* ── Layout ── */
+.match-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 24px;
+    align-items: start;
 }
-.event-min  { font-size: 11px; color: #6b7280; min-width: 28px; }
-.event-icon { font-size: 14px; }
-.event-player { font-size: 12px; color: #e5e7eb; flex: 1; }
-.event-assist { font-size: 11px; color: #6b7280; }
-.event-team-badge {
-    font-size: 9px; padding: 2px 6px; border-radius: 3px;
-    font-weight: 500;
-}
-.event-team-badge.home { background: #1a0000; color: #ef4444; }
-.event-team-badge.away { background: #001a33; color: #3b82f6; }
+@media (max-width: 1000px) { .match-layout { grid-template-columns: 1fr; } }
 
-.player-row {
-    display: flex; align-items: center; gap: 6px;
-    padding: 5px 0; border-bottom: 0.5px solid #161616;
+/* ── Player ── */
+.player-wrap {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
 }
-.player-row.sub { opacity: 0.7; }
-.player-num  { font-size: 11px; color: #4b5563; min-width: 20px; }
-.player-pos  { font-size: 10px; color: #4b5563; min-width: 16px; }
-.player-name { font-size: 12px; color: #e5e7eb; flex: 1; }
-.player-rating {
-    font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 3px;
-}
-.rating-high { background: #0d2b0d; color: #4ade80; }
-.rating-mid  { background: #2b2000; color: #fbbf24; }
-.rating-low  { background: #2b1000; color: #f97316; }
+.plyr-container { width: 100%; height: 100%; }
 
-.stat-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 0; border-bottom: 0.5px solid #161616;
-}
-.stat-val { font-size: 12px; font-weight: 500; color: #fff; min-width: 28px; }
-.stat-val.home { text-align: right; }
-.stat-val.away { text-align: left; }
-.stat-bars { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.stat-label { font-size: 10px; color: #4b5563; text-align: center; }
-.stat-bar-wrap {
-    width: 100%; height: 3px; background: #1a1a1a; border-radius: 2px;
+/* ── Click area + flash ── */
+.player-click-area {
+    position: absolute;
+    inset: 0;
+    bottom: 80px; /* không che Plyr controls (progress row + buttons row) */
+    z-index: 10;
+    cursor: pointer;
     display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.stat-bar-wrap.home { justify-content: flex-end; }
-.stat-bar-wrap.away { justify-content: flex-start; }
-.stat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+/* Nút play mặc định khi paused */
+.center-play-btn {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    border: 2px solid rgba(224,21,82,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.center-play-btn svg {
+    width: 30px;
+    height: 30px;
+    fill: #e01552;
+    filter: drop-shadow(0 0 6px rgba(224,21,82,0.6));
+    margin-left: 3px; /* optical center for triangle */
+}
 
-.sec-label { font-size: 10px; color: #4b5563; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 500; }
+/* Transition idle play button */
+.idle-play-enter-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.idle-play-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.idle-play-enter-from   { opacity: 0; transform: scale(0.85); }
+.idle-play-leave-to     { opacity: 0; transform: scale(1.1); }
+
+/* Flash icon khi click */
+.flash-icon {
+    position: absolute;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.flash-icon svg {
+    width: 28px;
+    height: 28px;
+}
+.flash-icon svg polygon { margin-left: 3px; }
+
+/* Transition flash */
+.icon-flash-enter-active { transition: opacity 0.08s ease, transform 0.08s ease; }
+.icon-flash-leave-active { transition: opacity 0.5s ease, transform 0.5s ease; }
+.icon-flash-enter-from   { opacity: 0; transform: scale(0.7); }
+.icon-flash-leave-to     { opacity: 0; transform: scale(1.5); }
+
+.player-placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; background: #0d0d12;
+}
+.ph-teams { display: flex; align-items: center; gap: 20px; }
+.ph-logo {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: #fff; border: 1.5px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.ph-logo img { width: 50px; height: 50px; object-fit: contain; }
+.ph-logo span { font-size: 16px; font-weight: 700; color: #1a1a1a; }
+.ph-vs { font-size: 22px; font-weight: 800; color: rgba(255,255,255,0.6); }
+.ph-label { font-size: 13px; color: #c0c0cc; }
+
+/* ── Source bar ── */
+.src-bar {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 12px; flex-wrap: wrap;
+}
+.src-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 13px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    background: #16161e; border: 1px solid #2a2a38;
+    color: #9090aa; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+}
+.src-btn:hover:not(.active) { border-color: #3a3a50; color: #e0e0f0; background: #1c1c28; }
+.src-btn.active { background: #e01552; border-color: #e01552; color: #fff; }
+.src-btn.fm-btn.active { background: #7c6fcd; border-color: #7c6fcd; color: #fff; }
+.src-btn.fm-btn:hover:not(.active) { border-color: #6050b0; color: #c0b8f0; }
+.src-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.hl-dot { background: #e01552; }
+.fm-dot { background: #7c6fcd; }
+.src-btn.active .src-dot { background: rgba(255,255,255,0.7); }
+.src-dur {
+    font-size: 10px; font-weight: 600; opacity: 1;
+    background: rgba(255,255,255,.15); border-radius: 4px;
+    padding: 1px 5px; margin-left: 2px; color: #e0e0f0;
+}
+.src-loading {
+    font-size: 11px; color: #9090aa;
+    margin-left: auto; padding: 0 4px;
+    animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
+@media (max-width: 480px) {
+    .src-btn { padding: 5px 11px; font-size: 11px; }
+    .src-dur { display: none; }
+}
+
+/* ── Match info card ── */
+.info-card {
+    background: #16161e;
+    border: 1px solid #26262f;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.info-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 8px;
+}
+.info-league { display: flex; align-items: center; gap: 8px; }
+.lg-logo { width: 22px; height: 22px; object-fit: contain; }
+.lg-name { font-size: 12px; font-weight: 700; color: #e01552; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge-round {
+    font-size: 10px; font-weight: 600; color: #c0c0cc;
+    background: #1c1c26; border: 0.5px solid #26262f;
+    padding: 3px 8px; border-radius: 99px;
+}
+.info-date { font-size: 12px; color: #b8b8c4; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.kick-time { font-size: 11px; color: #b8b8c8; }
+
+.teams-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 16px;
+}
+.team-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; border-radius: 10px; padding: 8px 4px; transition: background 0.15s; cursor: pointer; }
+.team-col:hover { background: rgba(255,255,255,0.04); }
+.team-col:hover .team-logo { box-shadow: 0 0 0 2px #ef4444; }
+.team-logo {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: #fff; border: 1.5px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.team-logo img { width: 56px; height: 56px; object-fit: contain; }
+.team-logo span { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+.team-name { font-size: 15px; font-weight: 600; color: #f5f5f7; text-align: center; line-height: 1.3; }
+
+.score-col { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.score-nums { display: flex; align-items: center; gap: 8px; font-size: 46px; font-weight: 800; color: #fff; letter-spacing: -2px; line-height: 1; }
+.score-dash { font-size: 32px; color: #888; }
+.show-score-btn {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #ffffff;
+    background: #1c1c26; border: 1px solid #26262f;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+}
+.show-score-btn:hover { border-color: #e01552; color: #e01552; }
+.ft-label { font-size: 10px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.meta-row {
+    display: flex; flex-wrap: wrap; gap: 6px 20px;
+    padding-top: 14px; border-top: 0.5px solid #26262f;
+}
+.meta-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; color: #c0c0cc;
+}
+
+.pen-label { font-size: 11px; color: #b8b8c4; }
+
+
+/* ── Tabs ── */
+.tabs-bar {
+    display: flex; gap: 2px; margin-bottom: 12px;
+    background: #16161e; border: 1px solid #26262f;
+    border-radius: 10px; padding: 4px;
+}
+.tab-btn {
+    flex: 1; padding: 8px 12px; font-size: 12px; font-weight: 600;
+    color: #c0c0cc; background: transparent;
+    border: none; border-radius: 7px; cursor: pointer; transition: all 0.15s;
+}
+.tab-btn.active { background: #e01552; color: #fff; }
+.tab-btn:hover:not(.active) { color: #f5f5f7; background: #1c1c26; }
+
+/* ── Tab panel ── */
+.tab-panel {
+    background: #16161e; border: 1px solid #26262f;
+    border-radius: 12px; padding: 16px;
+    min-height: 120px;
+}
+.empty-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 32px 16px;
+    font-size: 13px; color: #909098; text-align: center;
+}
+
+/* Stats panel */
+.stats-panel { padding: 0; }
+
+.stats-legend {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid #1c1c28;
+}
+.legend-team {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 700; color: #e8e8f0;
+    text-transform: uppercase; letter-spacing: 0.08em;
+}
+.legend-team.away { flex-direction: row-reverse; }
+.legend-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+.home-dot { background: #e01552; }
+.away-dot { background: #3b82f6; }
+
+/* Top donuts row */
+.donuts-row {
+    display: flex; justify-content: space-around; align-items: flex-start;
+    padding: 24px 12px 12px; gap: 8px;
+}
+.donut-item {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1;
+}
+.donut-vals {
+    display: flex; align-items: center; gap: 10px;
+}
+.donut-val {
+    font-size: 16px; font-weight: 800; min-width: 38px; text-align: center;
+}
+.donut-val.home { color: #b03550; }
+.donut-val.home.winner { color: #e01552; }
+.donut-val.away { color: #4070b8; }
+.donut-val.away.winner { color: #3b82f6; }
+.donut-ring {
+    width: 72px; height: 72px; border-radius: 50%;
+    position: relative; flex-shrink: 0;
+}
+.donut-hole {
+    position: absolute; inset: 13px;
+    border-radius: 50%; background: #16161e;
+}
+.donut-label {
+    font-size: 9px; font-weight: 700;
+    color: #a0a0bc; letter-spacing: 0.12em;
+    text-transform: uppercase; text-align: center;
+}
+@media (max-width: 480px) {
+    .donut-ring { width: 58px; height: 58px; }
+    .donut-hole { inset: 10px; }
+    .donut-val { font-size: 14px; min-width: 28px; }
+    .donut-label { font-size: 8px; }
+}
+
+/* Stat groups */
+.stat-group { border-top: 1px solid #1c1c28; }
+.stat-group-label {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+    color: #a0a0bc; text-transform: uppercase;
+}
+.stat-group-label::before,
+.stat-group-label::after {
+    content: ''; flex: 1; height: 1px; background: #2c2c40;
+}
+.stat-row {
+    display: grid;
+    grid-template-columns: 54px 1fr 54px;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 20px;
+}
+.stat-val {
+    font-size: 15px; font-weight: 700; color: #d06080;
+    text-align: right;
+}
+.stat-val.away { text-align: left; color: #6090d0; }
+.stat-val.winner { color: #e01552; font-weight: 800; }
+.stat-val.away.winner { color: #3b82f6; }
+
+.stat-mid { display: flex; flex-direction: column; gap: 7px; }
+.stat-name {
+    font-size: 10px; color: #b8b8d8; text-align: center;
+    text-transform: uppercase; letter-spacing: 0.07em;
+}
+.stat-bar {
+    display: flex; height: 7px; border-radius: 4px; overflow: hidden;
+    background: #1c1c28;
+}
+.stat-fill-home {
+    background: #e01552; height: 100%;
+    border-radius: 4px 0 0 4px;
+}
+.stat-fill-away {
+    background: #3b82f6; height: 100%;
+    border-radius: 0 4px 4px 0;
+    margin-left: auto;
+}
+
+
+/* Spoiler lock */
+.spoiler-lock {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 36px 16px;
+    text-align: center;
+}
+.spoiler-lock p { font-size: 13px; color: #c0c0cc; margin: 0; }
+
+/* Events */
+.event-row {
+    display: grid;
+    grid-template-columns: 1fr 36px 1fr;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 0.5px solid #1e1e28;
+}
+.event-row:last-child { border-bottom: none; }
+
+.event-min {
+    font-size: 11px; color: #c0c0cc; font-weight: 600;
+    text-align: center; flex-shrink: 0;
+}
+.event-icon { font-size: 14px; flex-shrink: 0; }
+
+.event-side {
+    display: flex; align-items: center; gap: 7px;
+}
+.event-home {
+    justify-content: flex-end;
+    text-align: right;
+}
+.event-away {
+    justify-content: flex-start;
+    text-align: left;
+}
+
+.event-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.event-player { font-size: 12.5px; color: #f0f0f0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.event-assist { font-size: 10.5px; color: #b8b8c8; }
+.subst-out { color: #ef4444; font-weight: 700; }
+.subst-in  { color: #22c55e; font-weight: 700; }
+
+/* ── Sidebar ── */
+.sidebar { display: flex; flex-direction: column; gap: 12px; }
+.sidebar-title {
+    margin: 0; font-size: 12px; font-weight: 700; color: #e0e0ec;
+    text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+.related-list { display: flex; flex-direction: column; gap: 10px; }
 
 .related-card {
-    display: flex; gap: 10px; text-decoration: none;
-    background: #111; border: 0.5px solid #1f1f1f;
-    border-radius: 8px; overflow: hidden;
+    display: flex; gap: 0;
+    background: #16161e; border: 1px solid #26262f;
+    border-radius: 10px; overflow: hidden;
+    transition: border-color 0.15s, transform 0.15s;
 }
-.related-card:hover { border-color: #2d2d2d; }
-.related-thumb { width: 80px; flex-shrink: 0; }
-.rel-logo {
-    width: 26px; height: 26px; border-radius: 50%;
-    background: rgba(0,0,0,0.5); border: 0.5px solid rgba(255,255,255,0.1);
+.related-card:hover { border-color: #3a3a44; transform: translateY(-1px); }
+
+.rel-thumb {
+    width: 96px; flex-shrink: 0; aspect-ratio: 16/9;
     display: flex; align-items: center; justify-content: center;
 }
+.rel-teams { display: flex; align-items: center; gap: 6px; padding: 8px; }
+.rel-logo {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #fff; border: 1px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
+}
+.rel-logo img { width: 20px; height: 20px; object-fit: contain; }
+.rel-logo span { font-size: 7px; font-weight: 700; color: #1a1a1a; }
+.rel-vs { font-size: 9px; color: #b0b0bc; flex-shrink: 0; }
+
+.rel-info { flex: 1; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
+.rel-title { margin: 0; font-size: 12px; font-weight: 600; color: #e5e7eb; line-height: 1.35; }
+.rel-date { font-size: 10.5px; color: #c0c0cc; }
+
+@media (max-width: 1000px) {
+    .sidebar { margin-top: 8px; }
+    .related-list { display: grid; grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .related-list { grid-template-columns: 1fr; }
+    .team-logo { width: 64px; height: 64px; }
+    .team-logo img { width: 44px; height: 44px; }
+    .score-nums { font-size: 36px; }
+    .team-name { font-size: 13px; }
+}
+
+
 </style>
