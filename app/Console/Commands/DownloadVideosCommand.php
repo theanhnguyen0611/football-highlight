@@ -40,6 +40,7 @@ class DownloadVideosCommand extends Command
                     continue;
                 }
 
+                $download->syncToStorage($video);
                 $video->refresh();
                 $this->info("  Done: {$video->file_size_mb} MB, {$video->duration_seconds}s");
 
