@@ -443,7 +443,7 @@ const statsGroups = computed(() => {
 })
 
 const playableVideos = computed(() => {
-    const ready = props.match.videos?.filter(v => v.status === 'ready' && v.stream_url) ?? []
+    const ready = props.match.videos?.filter(v => v.status === 'ready') ?? []
     const hasHoofoot = ready.some(v => v.source === 'hoofoot')
     // DasFootball chỉ hiện nếu không có Hoofoot (backup)
     return hasHoofoot ? ready.filter(v => v.source !== 'dasfootball') : ready
@@ -466,9 +466,16 @@ const videoIndexMap = computed(() => {
 })
 
 // ── Video ──────────────────────────────────────────
-function loadVideo(video) {
-    if (video.stream_url) playHls(video.stream_url)
-    else tryNextVideo()
+async function loadVideo(video) {
+    try {
+        const res = await fetch(`/api/videos/${video.id}/stream`)
+        if (!res.ok) { tryNextVideo(); return }
+        const { stream_url } = await res.json()
+        if (stream_url) playHls(stream_url)
+        else tryNextVideo()
+    } catch {
+        tryNextVideo()
+    }
 }
 
 function tryNextVideo() {

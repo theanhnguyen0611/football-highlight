@@ -426,7 +426,6 @@ class HomeController extends Controller
                 'source'           => $v->source,
                 'video_type'       => $v->video_type,
                 'status'           => $v->status,
-                'stream_url'       => $v->stream_url,
                 'quality'          => $v->quality,
                 'language'         => $v->language,
                 'duration_seconds' => $v->duration_seconds,
