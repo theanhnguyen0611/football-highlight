@@ -275,7 +275,7 @@ class DownloadService
     }
 
     // ─── Download tất cả pending videos (mọi source, không tách Hoofoot/DasFootball) ─
-    private function syncToStorage(MatchVideo $video): void
+    public function syncToStorage(MatchVideo $video): void
     {
         $ssh  = config('services.cdn.sx65_ssh');
         $base = config('services.cdn.sx65_path');
