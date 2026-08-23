@@ -35,10 +35,7 @@ class Team extends Model
     {
         if (!$this->logo_path) return null;
         if (str_starts_with($this->logo_path, 'http')) return $this->logo_path;
-        $cdn = config('services.cdn.url');
-        return $cdn
-            ? rtrim($cdn, '/') . '/bolareel/logos/' . $this->logo_path
-            : Storage::url($this->logo_path);
+        return Storage::url('logos/' . $this->logo_path);
     }
 
     // Tên theo locale — chỉ dịch national team

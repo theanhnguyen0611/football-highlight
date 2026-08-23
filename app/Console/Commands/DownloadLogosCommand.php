@@ -13,15 +13,6 @@ class DownloadLogosCommand extends Command
 
     public function handle(): void
     {
-        $ssh  = config('services.cdn.sx65_ssh');
-        $base = config('services.cdn.sx65_path');
-        $cdn  = config('services.cdn.url');
-
-        if (!$ssh || !$base || !$cdn) {
-            $this->error('SX65 hoặc CDN chưa cấu hình.');
-            return;
-        }
-
         $localBase = storage_path('app/public/logos');
         @mkdir("{$localBase}/teams",   0755, true);
         @mkdir("{$localBase}/leagues", 0755, true);
@@ -68,17 +59,7 @@ class DownloadLogosCommand extends Command
         $bar->finish();
         $this->newLine();
 
-        // ── Rsync lên SX65 ─────────────────────────────────────────────
-        $this->info('Syncing to SX65...');
-        $cmd = sprintf(
-            'rsync -az --mkpath --no-perms %s/ %s:%s/logos/',
-            escapeshellarg($localBase),
-            $ssh,
-            $base
-        );
-        shell_exec($cmd);
-
-        $this->info('Done! Logos served from CDN.');
+        $this->info('Done! Logos served from web server.');
     }
 
     private function download(string $url, string $path): bool
