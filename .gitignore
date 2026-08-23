@@ -5,3 +5,4 @@
 /storage/app/highlights
 .DS_Store
 public/hot
+/public/build
