@@ -1,7 +1,6 @@
 <?php
 namespace App\Console\Commands;
 
-use App\Models\FootballMatch;
 use App\Models\MatchVideo;
 use App\Services\DownloadService;
 use Illuminate\Console\Command;
@@ -13,44 +12,18 @@ class DownloadVideosCommand extends Command
 
     public function handle(DownloadService $download): void
     {
-        $videos = MatchVideo::with('match.homeTeam', 'match.awayTeam')
-            ->where('status', 'pending')
-            ->get();
+        $pending = MatchVideo::where('status', 'pending')
+            ->whereNotNull('embed_url')
+            ->whereNull('local_path')
+            ->count();
 
-        $this->info("Pending videos: " . $videos->count());
+        $this->info("Pending videos: {$pending}");
 
-        foreach ($videos as $video) {
-            $slug = $video->match->slug;
-            $this->line("\n  [{$video->id}] {$slug}");
+        // Dùng chung downloadAllPending() với cron để không lệch logic:
+        // nhận diện host → download → syncToStorage → markError khi hỏng.
+        $downloaded = $download->downloadAllPending();
 
-            try {
-                $video->markDownloading();
-
-                $hlsUrl = $download->getHlsUrl($video->embed_url);
-                if (!$hlsUrl) {
-                    $this->warn("  No HLS found");
-                    $video->markError();
-                    continue;
-                }
-
-                $ok = $download->downloadHls($video, $hlsUrl);
-                if (!$ok) {
-                    $this->warn("  Download failed");
-                    $video->markError();
-                    continue;
-                }
-
-                $download->syncToStorage($video);
-                $video->refresh();
-                $this->info("  Done: {$video->file_size_mb} MB, {$video->duration_seconds}s");
-            } catch (\Exception $e) {
-                $this->error("  Error: " . $e->getMessage());
-                $video->markError();
-            }
-
-            sleep(1);
-        }
-
-        $this->info("\nDone! Ready: " . MatchVideo::where('status', 'ready')->count() . " videos");
+        $this->info("Downloaded: {$downloaded}");
+        $this->info('Ready: ' . MatchVideo::where('status', 'ready')->count() . ' videos');
     }
 }

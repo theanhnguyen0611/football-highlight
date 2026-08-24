@@ -23,7 +23,7 @@ class MatchVideo extends Model
             if ($cdnUrl) {
                 return rtrim($cdnUrl, '/') . '/bolareel/' . $this->local_path;
             }
-            return route('api.hls', ['path' => $this->local_path]);
+            return route('hls.serve', ['path' => $this->local_path]);
         }
         return $this->embed_url ?? $this->source_url;
     }

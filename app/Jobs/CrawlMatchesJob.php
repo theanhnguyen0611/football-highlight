@@ -31,6 +31,11 @@ class CrawlMatchesJob implements ShouldQueue
             if ($i === 0) sleep(1);
         }
 
+        // Venue + events: cron trước đây không gọi nên trận sync qua cron
+        // không bao giờ có chi tiết (chỉ có khi chạy tay crawl:matches).
+        $detailed = $highlightly->syncFinishedMatchDetails(limit: 30);
+        Log::info('CrawlMatchesJob: details synced', ['count' => $detailed]);
+
         // Hoofoot: dùng full listings (bao gồm league pages)
         $listings = $crawl->crawlHoofootListings();
         Log::info('CrawlMatchesJob: listings', ['count' => count($listings)]);

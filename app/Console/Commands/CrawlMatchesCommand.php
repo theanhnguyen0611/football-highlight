@@ -40,6 +40,18 @@ class CrawlMatchesCommand extends Command
         $downloaded = $download->downloadAllPending();
         $this->line("  Downloaded: {$downloaded} videos");
 
+        // Step 5 vừa đánh dấu 'error' cho các video Hoofoot tải hỏng, giờ mới
+        // đủ điều kiện để findAndMapVideos() thử DasFootball cho đúng trận đó.
+        $this->info('Step 5b: Fallback DasFootball cho trận Hoofoot hỏng...');
+        $refallback = $crawl->findAndMapVideos($listings, limit: 100, tryDasFootball: true);
+        if ($refallback > 0) {
+            $this->line("  Mapped: {$refallback} videos");
+            $downloaded = $download->downloadAllPending();
+            $this->line("  Downloaded: {$downloaded} videos");
+        } else {
+            $this->line('  Không có trận nào cần fallback');
+        }
+
         $this->info('Step 6: Download new logos...');
         $this->call('logos:download');
 

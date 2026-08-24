@@ -25,10 +25,17 @@ class DownloadService
         return null;
     }
 
+    // Một response chỉ là playlist khi mở đầu bằng #EXTM3U — nếu không thì
+    // đó là trang lỗi, và parse tiếp sẽ sinh ra "segment" từ thẻ HTML.
+    private function isPlaylist(string $content): bool
+    {
+        return str_starts_with(ltrim($content), '#EXTM3U');
+    }
+
     public function getStreams(string $masterUrl): array
     {
         $content = $this->curlGet($masterUrl);
-        if (!$content) return [];
+        if (!$this->isPlaylist($content)) return [];
 
         $lines   = explode("\n", trim($content));
         $streams = [];
@@ -121,6 +128,7 @@ class DownloadService
 
         $totalSize     = 0;
         $totalDuration = 0;
+        $okStreams     = [];
 
         foreach ($streams as $stream) {
             $quality    = $stream['quality'];
@@ -128,7 +136,13 @@ class DownloadService
             if (!is_dir($segmentDir)) mkdir($segmentDir, 0755, true);
 
             $playlist = $this->curlGet($stream['url']);
-            if (!$playlist) continue;
+            if (!$this->isPlaylist($playlist)) {
+                Log::warning('HLS: response không phải playlist', [
+                    'video_id' => $video->id,
+                    'url'      => $stream['url'],
+                ]);
+                continue;
+            }
 
             file_put_contents("{$segmentDir}/playlist.m3u8", $playlist);
 
@@ -158,26 +172,43 @@ class DownloadService
                 }
             }
 
+            $gotSegments = 0;
             foreach ($segments as $idx => $segUrl) {
                 $segName = basename(parse_url($segUrl, PHP_URL_PATH)) ?: "seg_{$idx}.ts";
                 $segPath = "{$segmentDir}/{$segName}";
                 if (file_exists($segPath) && filesize($segPath) > 0) {
                     $totalSize += filesize($segPath);
+                    $gotSegments++;
                     continue;
                 }
-                $this->curlDownload($segUrl, $segPath);
-                $totalSize += file_exists($segPath) ? filesize($segPath) : 0;
+                if ($this->curlDownload($segUrl, $segPath)) {
+                    $totalSize += filesize($segPath);
+                    $gotSegments++;
+                }
+            }
+
+            // Stream không tải được segment nào thì bỏ hẳn, đừng đưa vào master
+            if ($gotSegments === 0) {
+                Log::warning('HLS: stream có 0 segment', ['video_id' => $video->id, 'quality' => $quality]);
+                continue;
             }
 
             $localPlaylist = $this->buildLocalPlaylist($playlist);
             file_put_contents("{$segmentDir}/index.m3u8", $localPlaylist);
             $totalDuration = max($totalDuration, (int) $duration);
+            $okStreams[]   = $stream;
         }
 
-        $localMaster = $this->buildLocalMaster($streams);
-        file_put_contents("{$outDir}/master.m3u8", $localMaster);
+        // Không có stream nào tải được → fail thật, đừng markReady 0 MB
+        if (empty($okStreams)) {
+            Log::error('HLS download failed: không tải được segment nào', [
+                'video_id' => $video->id,
+                'master'   => $masterUrl,
+            ]);
+            return false;
+        }
 
-        if (!file_exists("{$outDir}/master.m3u8")) return false;
+        file_put_contents("{$outDir}/master.m3u8", $this->buildLocalMaster($okStreams));
 
         $video->markReady(
             "{$relBase}/master.m3u8",
@@ -263,27 +294,6 @@ class DownloadService
         return true;
     }
 
-    public function downloadPendingYoutubeVideos(): int
-    {
-        $videos = MatchVideo::where('status', 'pending')
-            ->whereNull('local_path')
-            ->where(function ($q) {
-                $q->where('source_url', 'like', '%youtube.com%')
-                  ->orWhere('source_url', 'like', '%youtu.be%');
-            })
-            ->with('match')
-            ->get();
-
-        $count = 0;
-        foreach ($videos as $video) {
-            if ($this->downloadYoutube($video, $video->source_url)) {
-                $count++;
-            }
-        }
-        return $count;
-    }
-
-    // ─── Download tất cả pending videos (mọi source, không tách Hoofoot/DasFootball) ─
     public function syncToStorage(MatchVideo $video): void
     {
         $ssh  = config('services.cdn.sx65_ssh');
@@ -320,8 +330,15 @@ class DownloadService
         Log::info('syncToStorage done', ['video_id' => $video->id, 'path' => $relDir]);
     }
 
+    // ─── Download tất cả pending videos (mọi source) ─────────────
     public function downloadAllPending(): int
     {
+        // Row kẹt ở 'downloading' vì lần chạy trước bị crash/timeout —
+        // không reset thì chúng không bao giờ được thử lại.
+        MatchVideo::where('status', 'downloading')
+            ->where('updated_at', '<', now()->subHour())
+            ->update(['status' => 'pending']);
+
         $videos = MatchVideo::where('status', 'pending')
             ->whereNotNull('embed_url')
             ->whereNull('local_path')
@@ -330,62 +347,63 @@ class DownloadService
 
         $count = 0;
         foreach ($videos as $video) {
-            $url = $video->embed_url;
-            $ok  = false;
-
-            // HLS extracted from embed page (hoofoot/videas style)
-            $hlsUrl = $this->getHlsUrl($url);
-            if ($hlsUrl) {
-                $ok = $this->downloadHls($video, $hlsUrl);
-            } elseif (str_contains($url, '.m3u8')) {
-                $ok = $this->downloadHls($video, $url);
-            } elseif (
-                str_contains($url, 'youtube.com') ||
-                str_contains($url, 'youtu.be') ||
-                str_contains($url, 'streamable.com')
-            ) {
-                $ok = $this->downloadYoutube($video, $url);
-            } else {
-                Log::warning("downloadAllPending: unknown embed type for video {$video->id}: {$url}");
-                $video->markError();
-            }
-
-            if ($ok) {
-                $count++;
-                $this->syncToStorage($video);
+            try {
+                if ($this->downloadOne($video)) $count++;
+            } catch (\Throwable $e) {
+                // Một video hỏng không được làm chết cả lượt crawl
+                Log::error('downloadAllPending: exception', [
+                    'video_id' => $video->id,
+                    'error'    => $e->getMessage(),
+                ]);
+                // markError() cũng có thể ném (vd. enum 'error' chưa migrate)
+                try {
+                    $video->markError();
+                } catch (\Throwable $inner) {
+                    Log::error('downloadAllPending: markError failed', [
+                        'video_id' => $video->id,
+                        'error'    => $inner->getMessage(),
+                    ]);
+                }
             }
         }
 
         return $count;
     }
 
-    // ─── Download pending dasfootball videos: m3u8 → YouTube → Streamable ─
-    public function downloadPendingDasFootballVideos(): int
+    // Download 1 video rồi đẩy lên storage. Thất bại thì đánh dấu 'error' —
+    // findAndMapVideos() dựa vào status này để biết khi nào thử nguồn fallback.
+    private function downloadOne(MatchVideo $video): bool
     {
-        $videos = MatchVideo::where('source', 'dasfootball')
-            ->where('status', 'pending')
-            ->whereNull('local_path')
-            ->whereNotNull('embed_url')
-            ->with('match')
-            ->get();
+        $url = $video->embed_url;
+        $video->markDownloading();
 
-        $count = 0;
-        foreach ($videos as $video) {
-            $url = $video->embed_url;
-            $ok  = false;
-
-            if (str_contains($url, '.m3u8')) {
-                $ok = $this->downloadHls($video, $url);
-            } elseif (str_contains($url, 'youtube.com') || str_contains($url, 'youtu.be') || str_contains($url, 'streamable.com')) {
-                $ok = $this->downloadYoutube($video, $url);
-            } else {
-                Log::warning("DasFootball: unknown embed type for video {$video->id} → {$url}");
-                $video->markError();
-            }
-
-            if ($ok) $count++;
+        // Thứ tự quan trọng: nhận diện host trước khi fetch trang embed,
+        // tránh curl vô ích lên YouTube và tránh bắt nhầm .m3u8 của live stream.
+        if (str_contains($url, '.m3u8')) {
+            $ok = $this->downloadHls($video, $url);
+        } elseif (
+            str_contains($url, 'youtube.com') ||
+            str_contains($url, 'youtu.be') ||
+            str_contains($url, 'streamable.com')
+        ) {
+            $ok = $this->downloadYoutube($video, $url);
+        } elseif ($hlsUrl = $this->getHlsUrl($url)) {
+            // Trang embed kiểu videas.fr — HLS nằm trong HTML
+            $ok = $this->downloadHls($video, $hlsUrl);
+        } else {
+            Log::warning("downloadAllPending: no playable source for video {$video->id}: {$url}");
+            $video->markError();
+            return false;
         }
-        return $count;
+
+        if (!$ok) {
+            Log::warning("downloadAllPending: download failed for video {$video->id}: {$url}");
+            $video->markError();
+            return false;
+        }
+
+        $this->syncToStorage($video);
+        return true;
     }
 
     public function downloadFullMatchFromFile(MatchVideo $video, string $storedFilePath): bool
@@ -476,25 +494,55 @@ class DownloadService
         };
     }
 
-    private function curlGet(string $url): string
+    private function refererFor(string $url): string
     {
         preg_match('/https?:\/\/([^\/]+)/', $url, $m);
-        $referer = isset($m[1]) ? "https://{$m[1]}/" : 'https://hoofoot.com/';
-        $result  = shell_exec(sprintf(
-            'curl -s -L --max-time 30 -H "User-Agent: %s" -H "Accept: */*" -H "Referer: %s" "%s"',
-            $this->ua, $referer, $url
-        ));
-        return $result ?? '';
+        return isset($m[1]) ? "https://{$m[1]}/" : 'https://hoofoot.com/';
+    }
+
+    // -f: curl thoát khác 0 và không in body khi HTTP >= 400.
+    // Thiếu cờ này thì trang 404 HTML bị coi là nội dung hợp lệ.
+    private function curlGet(string $url): string
+    {
+        $cmd = sprintf(
+            'curl -sfL --max-time 30 -H "User-Agent: %s" -H "Accept: */*" -H "Referer: %s" %s',
+            $this->ua,
+            $this->refererFor($url),
+            escapeshellarg($url)
+        );
+
+        $out  = [];
+        $code = 0;
+        exec($cmd, $out, $code);
+
+        if ($code !== 0) {
+            Log::warning('curlGet failed', ['url' => $url, 'exit' => $code]);
+            return '';
+        }
+
+        return implode("\n", $out);
     }
 
     private function curlDownload(string $url, string $outPath): bool
     {
-        preg_match('/https?:\/\/([^\/]+)/', $url, $m);
-        $referer = isset($m[1]) ? "https://{$m[1]}/" : 'https://hoofoot.com/';
-        shell_exec(sprintf(
-            'curl -s -L --max-time 60 -H "User-Agent: %s" -H "Accept: */*" -H "Referer: %s" -o "%s" "%s"',
-            $this->ua, $referer, $outPath, $url
-        ));
-        return file_exists($outPath) && filesize($outPath) > 0;
+        $cmd = sprintf(
+            'curl -sfL --max-time 60 -H "User-Agent: %s" -H "Accept: */*" -H "Referer: %s" -o %s %s',
+            $this->ua,
+            $this->refererFor($url),
+            escapeshellarg($outPath),
+            escapeshellarg($url)
+        );
+
+        $out  = [];
+        $code = 0;
+        exec($cmd, $out, $code);
+
+        if ($code !== 0 || !file_exists($outPath) || filesize($outPath) === 0) {
+            // curl có thể đã tạo file rỗng/dở dang — xoá để lần sau không tưởng là đã tải xong
+            @unlink($outPath);
+            return false;
+        }
+
+        return true;
     }
 }

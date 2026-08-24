@@ -64,21 +64,33 @@ class HighlightlyService
         ]);
 
         $res = @file_get_contents($url, false, $ctx);
-        if (!$res) return null;
+        if (!$res) {
+            // $http_response_header do file_get_contents set, có cả khi HTTP 4xx/5xx
+            $status = $http_response_header[0] ?? 'no response';
+            Log::warning("Highlightly: request failed", ['endpoint' => $endpoint, 'status' => $status]);
+            return null;
+        }
 
         return json_decode($res, true);
     }
 
+    // Mỗi endpoint có trần `limit` riêng — vượt trần thì API trả HTTP 400.
+    private const PAGE_LIMITS = [
+        '/matches'    => 100,
+        '/highlights' => 40,
+        '/leagues'    => 100,
+    ];
+
     // ─── Lấy hết các trang của một endpoint ──────────────────
-    // API trả tối đa 100 rows/request kèm pagination.totalCount.
-    // Không phân trang thì các league lớn nằm ngoài 100 row đầu bị bỏ sót.
-    private function getAll(string $endpoint, array $params = [], int $maxPages = 12): array
+    // API trả tối đa PAGE_LIMITS[endpoint] rows/request kèm pagination.totalCount.
+    // Không phân trang thì các league lớn nằm ngoài trang đầu bị bỏ sót.
+    private function getAll(string $endpoint, array $params = [], int $maxPages = 15): array
     {
         $rows  = [];
-        $limit = 100;
+        $limit = self::PAGE_LIMITS[$endpoint] ?? 100;
 
         for ($page = 0; $page < $maxPages; $page++) {
-            $res = $this->get($endpoint, $params + ['limit' => $limit, 'offset' => $page * $limit]);
+            $res   = $this->get($endpoint, $params + ['limit' => $limit, 'offset' => $page * $limit]);
             $batch = $res['data'] ?? [];
             if (!$batch) break;
 
@@ -97,10 +109,9 @@ class HighlightlyService
     // ─── Sync Leagues ────────────────────────────────────────
     public function syncLeagues(): int
     {
-        $res  = $this->get('/leagues', ['limit' => 200]);
         $count = 0;
 
-        foreach ($res['data'] ?? [] as $l) {
+        foreach ($this->getAll('/leagues') as $l) {
             League::updateOrCreate(
                 ['highlightly_id' => $l['id']],
                 [

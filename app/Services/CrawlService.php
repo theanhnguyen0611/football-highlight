@@ -2,9 +2,7 @@
 namespace App\Services;
 
 use App\Models\FootballMatch;
-use App\Models\League;
 use App\Models\MatchVideo;
-use App\Models\Team;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -13,8 +11,6 @@ class CrawlService
     private string $hoofoot = 'https://hoofoot.com';
 
     private string $sitemap = 'https://hoofoot.com/matchsitemap.php';
-
-    public function __construct(private DownloadService $downloader) {}
 
     // ─── Crawl sitemap → league pages → [slug => match_id] ──────
     public function crawlHoofootListings(): array
@@ -122,203 +118,6 @@ class CrawlService
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         return $code;
-    }
-
-    // ─── Extract HLS URL từ videas.fr embed page ─────────────────
-    public function extractHlsUrl(string $embedUrl): ?string
-    {
-        $html = $this->fetch($embedUrl);
-        if (!$html) return null;
-
-        preg_match('/(https?:\/\/[^"\'\ ]+\.m3u8[^"\'\ ]*)/', $html, $m);
-        return $m[1] ?? null;
-    }
-
-    // ─── Import matches từ hoofoot slugs nếu chưa có trong DB ───────
-    // Dùng cho pre-season matches mà Highlightly không trả về.
-    public function importHoofootSlugsAsMatches(array $listings = []): int
-    {
-        if (empty($listings)) $listings = $this->crawlHoofootListings();
-        $cutoff    = now()->subDays(30)->format('Y-m-d');
-        $league    = League::firstOrCreate(
-            ['slug' => 'club-friendlies'],
-            ['name' => 'Club Friendlies', 'highlightly_id' => 99998]
-        );
-        $imported  = 0;
-
-        foreach ($listings as $slug => $matchId) {
-            $parts = explode('_', $slug);
-            if (count($parts) < 5) continue;
-
-            // Tách date (3 phần cuối: YYYY, MM, DD)
-            $dd    = array_pop($parts);
-            $mm    = array_pop($parts);
-            $yyyy  = array_pop($parts);
-            if (!is_numeric($yyyy) || !is_numeric($mm) || !is_numeric($dd)) continue;
-            $dateStr = "{$yyyy}-{$mm}-{$dd}";
-            if ($dateStr < $cutoff) continue; // chỉ import 30 ngày gần nhất
-
-            // Tách home/away quanh từ 'v' (hoofoot dùng _v_ làm separator)
-            $vIdx = array_search('v', $parts);
-            if ($vIdx === false || $vIdx === 0 || $vIdx >= count($parts) - 1) continue;
-
-            $homeName = implode(' ', array_slice($parts, 0, $vIdx));
-            $awayName = implode(' ', array_slice($parts, $vIdx + 1));
-            if (!$homeName || !$awayName) continue;
-
-            // Kiểm tra DB đã có match này chưa (theo slug)
-            $matchSlug = Str::slug("{$homeName}-vs-{$awayName}-{$dateStr}");
-            if (FootballMatch::where('slug', $matchSlug)->exists()) continue;
-
-            // Cũng kiểm tra ngược (home/away có thể bị đảo)
-            $reverseSlug = Str::slug("{$awayName}-vs-{$homeName}-{$dateStr}");
-            if (FootballMatch::where('slug', $reverseSlug)->exists()) continue;
-
-            $homeTeam = Team::findOrCreateByName($homeName);
-            $awayTeam = Team::findOrCreateByName($awayName);
-
-            FootballMatch::create([
-                'slug'         => $matchSlug,
-                'home_team_id' => $homeTeam->id,
-                'away_team_id' => $awayTeam->id,
-                'league_id'    => $league->id,
-                'match_date'   => $dateStr,
-                'match_status' => 'finished',
-            ]);
-
-            Log::info("Imported hoofoot match: {$homeName} vs {$awayName} on {$dateStr}");
-            $imported++;
-        }
-
-        return $imported;
-    }
-
-    // ─── Map hoofoot video vào match đã có trong DB (flow gốc) ──────────
-    public function mapVideosToMatches(array $listings = []): int
-    {
-        if (empty($listings)) $listings = $this->crawlHoofootListings();
-        $mapped = 0;
-
-        foreach ($listings as $slug => $matchId) {
-            $parts   = explode('_', $slug);
-            $dateStr = implode('-', array_slice($parts, -3));
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) continue;
-
-            $dbMatches = FootballMatch::with(['homeTeam', 'awayTeam'])
-                ->whereDate('match_date', $dateStr)
-                ->get();
-
-            foreach ($dbMatches as $match) {
-                $homeName  = strtolower(str_replace([' ', '.', '-'], '_', $match->homeTeam->name));
-                $awayName  = strtolower(str_replace([' ', '.', '-'], '_', $match->awayTeam->name));
-                $slugLower = strtolower($slug);
-
-                if (!str_contains($slugLower, $homeName) && !str_contains($slugLower, $awayName)) {
-                    continue;
-                }
-
-                $existing = MatchVideo::where('match_id', $match->id)
-                    ->where('source', 'hoofoot')
-                    ->first();
-
-                if ($existing && ($existing->status === 'ready' || $existing->embed_url)) {
-                    $mapped++;
-                    break;
-                }
-
-                $sourceUrl = "{$this->hoofoot}/?match={$slug}";
-                $embedUrl  = $this->getEmbedUrl($sourceUrl);
-
-                if (!$embedUrl) {
-                    usleep(500000);
-                    continue;
-                }
-
-                MatchVideo::updateOrCreate(
-                    ['match_id' => $match->id, 'source' => 'hoofoot'],
-                    ['source_url' => $sourceUrl, 'embed_url' => $embedUrl, 'local_path' => null, 'status' => 'pending']
-                );
-                $mapped++;
-                break;
-            }
-
-            usleep(500000);
-        }
-
-        return $mapped;
-    }
-
-    // ─── Backfill embed_url cho videos pending chưa có URL ───────────
-    public function backfillEmbedUrls(): int
-    {
-        $videos = MatchVideo::where('status', 'pending')
-            ->where('source', 'hoofoot')
-            ->whereNull('embed_url')
-            ->whereNotNull('source_url')
-            ->get();
-
-        $filled = 0;
-        foreach ($videos as $video) {
-            $embedUrl = $this->getEmbedUrl($video->source_url);
-            if ($embedUrl) {
-                $video->update(['embed_url' => $embedUrl]);
-                $filled++;
-            }
-            sleep(2);
-        }
-        return $filled;
-    }
-
-    // ─── Download tất cả hoofoot videos pending ──────────────────────
-    public function downloadPendingVideos(): int
-    {
-        $videos = MatchVideo::where('status', 'pending')
-            ->where('source', 'hoofoot')
-            ->whereNotNull('embed_url')
-            ->whereNull('local_path')
-            ->with('match')
-            ->get();
-
-        $downloaded = 0;
-        foreach ($videos as $video) {
-            $embed  = $video->embed_url;
-            $hlsUrl = $this->downloader->getHlsUrl($embed);
-            if ($hlsUrl) {
-                if ($this->downloader->downloadHls($video, $hlsUrl)) $downloaded++;
-                continue;
-            }
-            if (str_contains($embed, 'youtube.com') || str_contains($embed, 'youtu.be')) {
-                if ($this->downloader->downloadYoutube($video, $embed)) $downloaded++;
-            }
-        }
-        return $downloaded;
-    }
-
-    // ─── DasFootball fallback cho matches chưa có video ──────────────
-    public function mapDasFootballFallback(int $limit = 20): int
-    {
-        $matches = FootballMatch::with(['homeTeam', 'awayTeam', 'league'])
-            ->where('match_status', 'finished')
-            ->whereNotNull('home_score')
-            ->whereHas('league', fn($q) => $q->whereNotIn('name', ['International Friendlies', 'Club Friendlies']))
-            ->whereDoesntHave('videos', fn($q) => $q->where('source', 'dasfootball')->whereIn('status', ['pending', 'ready']))
-            ->orderByDesc('match_date')
-            ->limit($limit)
-            ->get();
-
-        $mapped = 0;
-        foreach ($matches as $match) {
-            $video = $this->crawlDasFootball($match);
-            if (!$video) { usleep(500000); continue; }
-
-            MatchVideo::updateOrCreate(
-                ['match_id' => $match->id, 'source' => 'dasfootball'],
-                ['video_type' => 'highlight', 'embed_url' => $video['url'], 'source_url' => $video['url'], 'status' => 'pending']
-            );
-            $mapped++;
-            usleep(500000);
-        }
-        return $mapped;
     }
 
     // ─── Lấy recent slugs từ sitemap chính (không crawl league pages) ─
@@ -504,27 +303,6 @@ class CrawlService
             CURLOPT_HTTPHEADER     => [
                 'Accept: text/html,application/xhtml+xml,*/*',
                 'Accept-Language: en-US,en;q=0.9',
-            ],
-        ]);
-        $html = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        return ($html && $code === 200) ? $html : null;
-    }
-
-    private function post(string $url, array $data): ?string
-    {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => http_build_query($data),
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            CURLOPT_HTTPHEADER     => [
-                'Accept: */*',
-                'X-Requested-With: XMLHttpRequest',
-                'Referer: https://hoofoot.com/',
             ],
         ]);
         $html = curl_exec($ch);
