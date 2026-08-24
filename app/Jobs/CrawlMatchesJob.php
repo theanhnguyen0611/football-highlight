@@ -6,6 +6,7 @@ use App\Services\CrawlService;
 use App\Services\DownloadService;
 use App\Services\HighlightlyService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -13,12 +14,16 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
-class CrawlMatchesJob implements ShouldQueue
+class CrawlMatchesJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 900;
+    public int $timeout = 2400;
     public int $tries   = 1;
+
+    // Cron đẩy job dày hơn thời gian chạy → chặn chồng lượt.
+    // Khoá hết hạn cùng lúc timeout để job treo không kẹt mãi.
+    public int $uniqueFor = 2400;
 
     public function handle(HighlightlyService $highlightly, CrawlService $crawl): void
     {
