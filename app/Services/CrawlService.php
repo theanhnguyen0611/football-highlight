@@ -289,6 +289,17 @@ class CrawlService
 
             $data = json_decode(trim($output), true);
             if (!empty($data['embedUrl'])) {
+                // Script đã xếp hạng hls > mp4 > streamable > iframe > youtube.
+                // Log cả danh sách để biết trang có gì mà mình bỏ qua.
+                Log::info('DasFootball: nguồn tìm được', [
+                    'match'   => $match->slug,
+                    'chọn'    => $data['type'] ?? 'iframe',
+                    'sources' => array_map(
+                        fn($s) => ($s['type'] ?? '?') . ' ' . ($s['url'] ?? ''),
+                        $data['sources'] ?? []
+                    ),
+                ]);
+
                 return ['url' => $data['embedUrl'], 'type' => $data['type'] ?? 'iframe'];
             }
             // "not found" → bỏ qua toàn bộ match luôn (không thử pattern khác)
