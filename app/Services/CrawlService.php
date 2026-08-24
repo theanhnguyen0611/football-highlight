@@ -407,16 +407,36 @@ class CrawlService
         return $mapped;
     }
 
+    // Hoofoot dùng tên viết tắt cho một số team — map từ tên DB chuẩn sang alias Hoofoot
+    private const HOOFOOT_ALIASES = [
+        'paris_saint_germain'         => ['psg'],
+        'internazionale'              => ['inter', 'inter_milan'],
+        'wolverhampton_wanderers'     => ['wolves'],
+        'tottenham_hotspur'           => ['spurs'],
+        'west_ham_united'             => ['west_ham'],
+        'newcastle_united'            => ['newcastle'],
+        'brighton_hove_albion'        => ['brighton'],
+        'borussia_monchengladbach'    => ['gladbach', 'monchengladbach'],
+        'atletico_madrid'             => ['atletico'],
+        'sporting_cp'                 => ['sporting'],
+        'benfica'                     => ['sl_benfica'],
+        'rcd_mallorca'                => ['mallorca'],
+        'real_betis_balompie'         => ['real_betis'],
+        'deportivo_alaves'            => ['alaves'],
+        'rayo_vallecano'              => ['rayo'],
+    ];
+
     private function findMatchingSlug(FootballMatch $match, array $slugs): ?string
     {
-        $homeName = strtolower(str_replace([' ', '.', '-'], '_', $match->homeTeam->name));
-        $awayName = strtolower(str_replace([' ', '.', '-'], '_', $match->awayTeam->name));
+        $homeName  = strtolower(str_replace([' ', '.', '-'], '_', $match->homeTeam->name));
+        $awayName  = strtolower(str_replace([' ', '.', '-'], '_', $match->awayTeam->name));
+        $homeNames = array_merge([$homeName], self::HOOFOOT_ALIASES[$homeName] ?? []);
+        $awayNames = array_merge([$awayName], self::HOOFOOT_ALIASES[$awayName] ?? []);
 
         foreach ($slugs as $slug) {
             $lower = strtolower($slug);
-            if (str_contains($lower, $homeName) || str_contains($lower, $awayName)) {
-                return $slug;
-            }
+            foreach ($homeNames as $n) { if (str_contains($lower, $n)) return $slug; }
+            foreach ($awayNames as $n) { if (str_contains($lower, $n)) return $slug; }
         }
 
         return null;
