@@ -141,6 +141,15 @@ check() {
 }
 check "ffmpeg"  ffmpeg -version
 check "rsync"   rsync --version
+
+# thumbnails:download chuyển ảnh sang WebP bằng GD — php-gd của Ubuntu có sẵn
+# WebP, nhưng bản build khác thì chưa chắc.
+if php -r 'exit(function_exists("imagewebp") ? 0 : 1);'; then
+    ok "php-gd có WebP"
+else
+    fail "php-gd THIẾU WebP — apt install php8.4-gd"; FAILED=1
+fi
+
 check "node"    node -v
 check "deno"    deno --version
 check "yt-dlp"  /usr/local/bin/yt-dlp --version
