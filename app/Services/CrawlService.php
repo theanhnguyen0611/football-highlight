@@ -138,8 +138,9 @@ class CrawlService
         }, ARRAY_FILTER_USE_BOTH);
     }
 
-    // ─── Unified: find + save video records — thử cả Hoofoot VÀ DasFootball độc lập ─
-    // Mỗi source được check riêng: nếu chưa có thì thử, không skip source còn lại.
+    // ─── Find + save video records: Hoofoot là nguồn chính, DasFootball là backup ─
+    // DasFootball CHỈ chạy khi không có video Hoofoot dùng được — nó tốn Playwright
+    // nên không thử song song.
     // Match chỉ hiển thị khi có ít nhất 1 video ready (filter ở HomeController).
     public function findAndMapVideos(array $listings, int $limit = 100, bool $tryDasFootball = false): int
     {
@@ -169,16 +170,24 @@ class CrawlService
             $slugsForDate = $slugsByDate[$dateStr] ?? [];
 
             $hoofootVideo = $match->videos->where('source', 'hoofoot')->whereIn('status', ['pending', 'ready'])->first();
+            $hoofootError = $match->videos->where('source', 'hoofoot')->where('status', 'error')->first();
             $hasDasFB     = $match->videos->where('source', 'dasfootball')->whereIn('status', ['pending', 'ready'])->isNotEmpty();
 
-            // Thử Hoofoot nếu chưa có
+            // Thử Hoofoot nếu chưa có row dùng được
             if (!$hoofootVideo) {
                 $hoofootSlug = $this->findMatchingSlug($match, $slugsForDate);
                 if ($hoofootSlug) {
                     $sourceUrl = "{$this->hoofoot}/?match={$hoofootSlug}";
                     $embedUrl  = $this->getEmbedUrl($sourceUrl);
-                    if ($embedUrl) {
-                        MatchVideo::updateOrCreate(
+
+                    // Lần trước tải hỏng mà embed_url không đổi → tải lại cũng hỏng y
+                    // hệt. Giữ nguyên 'error' và nhường luôn cho DasFootball.
+                    $sameFailedUrl = $hoofootError && $hoofootError->embed_url === $embedUrl;
+
+                    if ($embedUrl && !$sameFailedUrl) {
+                        // Giữ lại kết quả để bên dưới biết Hoofoot đã có — thiếu dòng
+                        // gán này thì DasFootball chạy cả khi Hoofoot vừa map xong.
+                        $hoofootVideo = MatchVideo::updateOrCreate(
                             ['match_id' => $match->id, 'source' => 'hoofoot'],
                             ['source_url' => $sourceUrl, 'embed_url' => $embedUrl, 'local_path' => null, 'status' => 'pending']
                         );
@@ -188,9 +197,8 @@ class CrawlService
                 }
             }
 
-            // DasFootball chỉ làm backup: thử khi Hoofoot không có hoặc bị lỗi
-            $hoofootMissing = !$hoofootVideo || $match->videos->where('source', 'hoofoot')->where('status', 'error')->isNotEmpty();
-            if ($tryDasFootball && $hoofootMissing && !$hasDasFB) {
+            // Backup: chỉ chạy khi không có video Hoofoot nào dùng được
+            if ($tryDasFootball && !$hoofootVideo && !$hasDasFB) {
                 $video = $this->crawlDasFootball($match);
                 if ($video) {
                     MatchVideo::updateOrCreate(
