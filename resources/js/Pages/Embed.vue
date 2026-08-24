@@ -139,7 +139,7 @@ function playHls(url, cdnAuth = {}) {
     if (cdn_token) {
         hlsConfig.xhrSetup = (xhr, reqUrl) => {
             const sep = reqUrl.includes('?') ? '&' : '?'
-            xhr.open('GET', `${reqUrl}${sep}token=${cdn_token}&expires=${cdn_expires}&token_path=${encodeURIComponent(cdn_token_path)}`)
+            xhr.open('GET', `${reqUrl}${sep}token=${cdn_token}&expires=${cdn_expires}&token_path=${cdn_token_path}`, true)
         }
     }
 
