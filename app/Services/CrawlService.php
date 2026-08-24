@@ -407,7 +407,7 @@ class CrawlService
         return $mapped;
     }
 
-    // Hoofoot dùng tên viết tắt cho một số team — map từ tên DB chuẩn sang alias Hoofoot
+    // Hoofoot dùng tên viết tắt cho một số team — map từ tên DB chuẩn (đã bỏ dấu) sang alias Hoofoot
     private const HOOFOOT_ALIASES = [
         'paris_saint_germain'         => ['psg'],
         'internazionale'              => ['inter', 'inter_milan'],
@@ -417,19 +417,32 @@ class CrawlService
         'newcastle_united'            => ['newcastle'],
         'brighton_hove_albion'        => ['brighton'],
         'borussia_monchengladbach'    => ['gladbach', 'monchengladbach'],
+        'atletico_de_madrid'          => ['atletico', 'atletico_madrid'],
         'atletico_madrid'             => ['atletico'],
         'sporting_cp'                 => ['sporting'],
         'benfica'                     => ['sl_benfica'],
         'rcd_mallorca'                => ['mallorca'],
-        'real_betis_balompie'         => ['real_betis'],
+        'real_betis_balompie'         => ['real_betis', 'betis'],
         'deportivo_alaves'            => ['alaves'],
         'rayo_vallecano'              => ['rayo'],
+        'nottingham_forest'           => ['nottingham'],
+        'olympique_lyonnais'          => ['lyon'],
+        'olympique_de_marseille'      => ['marseille', 'olympique_marseille'],
     ];
+
+    private function normalizeName(string $name): string
+    {
+        $name = strtolower($name);
+        $name = str_replace([' ', '.', '-'], '_', $name);
+        // Bỏ dấu: é→e, á→a, ü→u, v.v.
+        $name = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $name) ?: $name;
+        return preg_replace('/[^a-z0-9_]/', '', $name);
+    }
 
     private function findMatchingSlug(FootballMatch $match, array $slugs): ?string
     {
-        $homeName  = strtolower(str_replace([' ', '.', '-'], '_', $match->homeTeam->name));
-        $awayName  = strtolower(str_replace([' ', '.', '-'], '_', $match->awayTeam->name));
+        $homeName  = $this->normalizeName($match->homeTeam->name);
+        $awayName  = $this->normalizeName($match->awayTeam->name);
         $homeNames = array_merge([$homeName], self::HOOFOOT_ALIASES[$homeName] ?? []);
         $awayNames = array_merge([$awayName], self::HOOFOOT_ALIASES[$awayName] ?? []);
 

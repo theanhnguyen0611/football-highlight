@@ -2,94 +2,83 @@
 
 namespace App\Console\Commands;
 
-use App\Models\FootballMatch;
+use App\Models\Team;
 use App\Services\CrawlService;
 use Illuminate\Console\Command;
 
 class ScanHoofootMismatchesCommand extends Command
 {
-    protected $signature   = 'hoofoot:scan-mismatches {--days=3}';
-    protected $description = 'Tìm DB matches không map được với Hoofoot slug → bổ sung HOOFOOT_ALIASES';
+    protected $signature   = 'hoofoot:scan-mismatches';
+    protected $description = 'So sánh tên team trong Hoofoot slugs với DB → tìm alias cần thêm vào HOOFOOT_ALIASES';
 
     public function handle(CrawlService $crawl): void
     {
-        $days     = (int) $this->option('days');
+        $this->info('Fetching Hoofoot listings...');
         $listings = $crawl->crawlHoofootListings();
+        $this->info('Slugs found: ' . count($listings));
 
-        $this->info('Hoofoot slugs found: ' . count($listings));
+        // Extract team names từ slug: "Manchester_City_v_Bournemouth_2026_08_23"
+        // → split trên "_v_", bỏ date ở cuối
+        $hoofootTeams = [];
+        foreach (array_keys($listings) as $slug) {
+            // Tách phần date (3 số cuối): _YYYY_MM_DD
+            $core = preg_replace('/_\d{4}_\d{2}_\d{2}$/', '', $slug);
 
-        // Group slugs by date
-        $slugsByDate = [];
-        foreach ($listings as $slug => $_) {
-            $parts   = explode('_', $slug);
-            $dateStr = implode('-', array_slice($parts, -3));
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
-                $slugsByDate[$dateStr][] = $slug;
+            // Split trên _v_ (case-insensitive)
+            $parts = preg_split('/_v_/i', $core, 2);
+            if (count($parts) === 2) {
+                $hoofootTeams[strtolower($parts[0])] = $parts[0];
+                $hoofootTeams[strtolower($parts[1])] = $parts[1];
             }
         }
 
-        $cutoff  = now()->subDays($days)->format('Y-m-d');
-        $matches = FootballMatch::with(['homeTeam', 'awayTeam'])
-            ->where('match_status', 'finished')
-            ->whereIn(\DB::raw('DATE(match_date)'), array_keys($slugsByDate))
-            ->where('match_date', '>=', $cutoff)
-            ->whereDoesntHave('videos', fn($q) => $q->whereIn('status', ['pending', 'ready']))
-            ->get();
+        $this->info('Unique Hoofoot team names: ' . count($hoofootTeams));
 
-        $this->info("DB matches without video (last {$days} days): " . $matches->count());
+        // Load tất cả DB teams (normalize bỏ dấu)
+        $dbTeams = Team::all()->mapWithKeys(fn($t) => [
+            $this->normalize($t->name) => $t->name
+        ]);
+
+        // Tìm Hoofoot team nào không match bất kỳ DB team nào
+        $this->newLine();
+        $this->warn('Hoofoot names không match DB team nào:');
         $this->newLine();
 
-        $mismatches = [];
-        foreach ($matches as $match) {
-            $dateStr  = $match->match_date->format('Y-m-d');
-            $slugs    = $slugsByDate[$dateStr] ?? [];
-            $homeName = strtolower(str_replace([' ', '.', '-'], '_', $match->homeTeam->name));
-            $awayName = strtolower(str_replace([' ', '.', '-'], '_', $match->awayTeam->name));
+        $unmatched = [];
+        foreach ($hoofootTeams as $key => $original) {
+            // Check xem DB có team nào chứa key này không (hoặc key chứa DB name)
+            $found = $dbTeams->first(function ($dbName, $dbKey) use ($key) {
+                return str_contains($key, $dbKey) || str_contains($dbKey, $key);
+            });
 
-            // Tìm slug match được
-            $matched = null;
-            foreach ($slugs as $slug) {
-                $lower = strtolower($slug);
-                if (str_contains($lower, $homeName) || str_contains($lower, $awayName)) {
-                    $matched = $slug;
-                    break;
-                }
-            }
-
-            if (!$matched) {
-                // Tìm slug gần nhất cho ngày đó
-                $candidates = array_filter($slugs, fn($s) => true); // all slugs that day
-                $mismatches[] = [
-                    'match'      => "{$match->homeTeam->name} vs {$match->awayTeam->name} ({$dateStr})",
-                    'home_key'   => $homeName,
-                    'away_key'   => $awayName,
-                    'candidates' => array_slice($candidates, 0, 10),
-                ];
+            if (!$found) {
+                $unmatched[$key] = $original;
             }
         }
 
-        if (empty($mismatches)) {
-            $this->info('Không có mismatch nào!');
+        if (empty($unmatched)) {
+            $this->info('Tất cả Hoofoot teams đều match được với DB!');
             return;
         }
 
-        $this->warn(count($mismatches) . ' matches không map được:');
+        // Sort để dễ đọc
+        ksort($unmatched);
+
+        $this->table(
+            ['Hoofoot name (gốc)', 'Key cần alias'],
+            array_map(fn($orig, $key) => [$orig, $key], $unmatched, array_keys($unmatched))
+        );
+
         $this->newLine();
+        $this->info('→ Với các team trên, tìm DB name tương ứng rồi thêm vào HOOFOOT_ALIASES trong CrawlService.php');
+        $this->info('   Ví dụ: \'paris_saint_germain\' => [\'psg\']');
+    }
 
-        foreach ($mismatches as $m) {
-            $this->line("<fg=yellow>{$m['match']}</>");
-            $this->line("  DB keys: <fg=cyan>{$m['home_key']}</> | <fg=cyan>{$m['away_key']}</>");
-            if ($m['candidates']) {
-                $this->line('  Hoofoot slugs ngày đó:');
-                foreach ($m['candidates'] as $slug) {
-                    $this->line("    - {$slug}");
-                }
-            } else {
-                $this->line('  (Hoofoot không có slug nào cho ngày này)');
-            }
-            $this->newLine();
-        }
-
-        $this->info('→ Với các case trên, thêm alias vào HOOFOOT_ALIASES trong CrawlService.php');
+    private function normalize(string $name): string
+    {
+        $name = strtolower($name);
+        $name = str_replace([' ', '.', '-'], '_', $name);
+        $name = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $name) ?: $name;
+        return preg_replace('/[^a-z0-9_]/', '', $name);
     }
 }
