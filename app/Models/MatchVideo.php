@@ -28,11 +28,6 @@ class MatchVideo extends Model
         return $this->embed_url ?? $this->source_url;
     }
 
-    public function isReady(): bool
-    {
-        return $this->status === 'ready' && $this->local_path;
-    }
-
     public function markReady(string $localPath, float $sizeMb, int $duration): void
     {
         $this->update([

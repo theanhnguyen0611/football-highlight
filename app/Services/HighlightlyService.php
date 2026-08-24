@@ -4,7 +4,6 @@ namespace App\Services;
 use App\Models\Team;
 use App\Models\League;
 use App\Models\FootballMatch;
-use App\Models\MatchVideo;
 use App\Models\MatchEvent;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
@@ -104,29 +103,6 @@ class HighlightlyService
         }
 
         return $rows;
-    }
-
-    // ─── Sync Leagues ────────────────────────────────────────
-    public function syncLeagues(): int
-    {
-        $count = 0;
-
-        foreach ($this->getAll('/leagues') as $l) {
-            League::updateOrCreate(
-                ['highlightly_id' => $l['id']],
-                [
-                    'name'           => $l['name'],
-                    'slug'           => Str::slug($l['name']),
-                    'logo_path'      => $l['logo'] ?? null,
-                    'country'        => $l['country']['name'] ?? null,
-                    'highlightly_id' => $l['id'],
-                ]
-            );
-            $count++;
-        }
-
-        Log::info("Highlightly: synced {$count} leagues");
-        return $count;
     }
 
     // ─── Sync một ngày: /matches + /highlights trong 1 lần lặp ──
