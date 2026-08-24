@@ -69,6 +69,31 @@ class HighlightlyService
         return json_decode($res, true);
     }
 
+    // ─── Lấy hết các trang của một endpoint ──────────────────
+    // API trả tối đa 100 rows/request kèm pagination.totalCount.
+    // Không phân trang thì các league lớn nằm ngoài 100 row đầu bị bỏ sót.
+    private function getAll(string $endpoint, array $params = [], int $maxPages = 12): array
+    {
+        $rows  = [];
+        $limit = 100;
+
+        for ($page = 0; $page < $maxPages; $page++) {
+            $res = $this->get($endpoint, $params + ['limit' => $limit, 'offset' => $page * $limit]);
+            $batch = $res['data'] ?? [];
+            if (!$batch) break;
+
+            $rows = array_merge($rows, $batch);
+
+            $total = $res['pagination']['totalCount'] ?? null;
+            if (count($batch) < $limit) break;
+            if ($total !== null && count($rows) >= $total) break;
+
+            sleep(1);
+        }
+
+        return $rows;
+    }
+
     // ─── Sync Leagues ────────────────────────────────────────
     public function syncLeagues(): int
     {
@@ -102,8 +127,7 @@ class HighlightlyService
         $videoCount = 0;
 
         // Bước A: lấy matches theo ngày — chỉ lưu khi finished + có score
-        $res = $this->get('/matches', ['date' => $date, 'limit' => 100]);
-        foreach ($res['data'] ?? [] as $m) {
+        foreach ($this->getAll('/matches', ['date' => $date]) as $m) {
             if (!in_array($m['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
             if ($this->mapStatus($m['state']['description'] ?? null) !== 'finished') continue;
             if (!$this->hasScore($m)) continue;
@@ -113,8 +137,7 @@ class HighlightlyService
         sleep(1);
 
         // Bước B: lấy highlights — upsert match nếu chưa có, cũng chỉ khi finished + có score
-        $res = $this->get('/highlights', ['date' => $date, 'limit' => 100]);
-        foreach ($res['data'] ?? [] as $h) {
+        foreach ($this->getAll('/highlights', ['date' => $date]) as $h) {
             $md = $h['match'] ?? null;
             if (!$md || !in_array($md['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
             if ($this->mapStatus($md['state']['description'] ?? null) !== 'finished') continue;
