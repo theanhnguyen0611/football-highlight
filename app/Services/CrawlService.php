@@ -224,8 +224,7 @@ class CrawlService
         'newcastle_united'            => ['newcastle'],
         'brighton_hove_albion'        => ['brighton'],
         'borussia_monchengladbach'    => ['gladbach', 'monchengladbach'],
-        'atletico_de_madrid'          => ['atletico', 'atletico_madrid'],
-        'atletico_madrid'             => ['atletico'],
+        'atletico_de_madrid'          => ['atletico_madrid'],
         'sporting_cp'                 => ['sporting'],
         'benfica'                     => ['sl_benfica'],
         'rcd_mallorca'                => ['mallorca'],
@@ -246,6 +245,37 @@ class CrawlService
         return preg_replace('/[^a-z0-9_]/', '', $name);
     }
 
+    // "Manchester_City_v_Bournemouth_2026_08_23" → ['manchester_city', 'bournemouth']
+    private function splitHoofootSlug(string $slug): array
+    {
+        $parts = explode('_', strtolower($slug));
+        if (count($parts) < 5) return [null, null];
+
+        $parts = array_slice($parts, 0, -3);          // bỏ Y_m_d
+        $vIdx  = array_search('v', $parts, true);     // Hoofoot dùng _v_ làm dấu phân cách
+        if ($vIdx === false || $vIdx === 0 || $vIdx >= count($parts) - 1) return [null, null];
+
+        return [
+            implode('_', array_slice($parts, 0, $vIdx)),
+            implode('_', array_slice($parts, $vIdx + 1)),
+        ];
+    }
+
+    // 2 = trùng khít, 1 = một bên là tiền tố theo token của bên kia, 0 = không khớp
+    private function sideMatch(?string $side, array $names): int
+    {
+        if ($side === null || $side === '') return 0;
+
+        foreach ($names as $n) {
+            if ($side === $n) return 2;
+        }
+        foreach ($names as $n) {
+            if (str_starts_with($side, $n . '_') || str_starts_with($n, $side . '_')) return 1;
+        }
+
+        return 0;
+    }
+
     private function findMatchingSlug(FootballMatch $match, array $slugs): ?string
     {
         $homeName  = $this->normalizeName($match->homeTeam->name);
@@ -253,10 +283,39 @@ class CrawlService
         $homeNames = array_merge([$homeName], self::HOOFOOT_ALIASES[$homeName] ?? []);
         $awayNames = array_merge([$awayName], self::HOOFOOT_ALIASES[$awayName] ?? []);
 
+        // Bản cũ trả về slug ĐẦU TIÊN chỉ cần MỘT đội khớp. Khi DB chỉ có ~150
+        // trận thì hiếm khi sai, nhưng sau backfill một năm thì mỗi ngày có hàng
+        // chục trận và alias ngắn dễ đụng nhau: 'inter' (Internazionale) khớp cả
+        // Inter_Miami, 'sporting' khớp cả Sporting_Kansas_City.
+        //
+        // Giờ: khớp CẢ HAI đội thì chắc chắn đúng, nhận ngay. Chỉ khớp một đội
+        // thì chỉ nhận khi trong ngày đó không còn ứng viên nào khác — mơ hồ thì
+        // thà bỏ qua còn hơn gán nhầm video sang trận khác.
+        $partial = [];
+
         foreach ($slugs as $slug) {
-            $lower = strtolower($slug);
-            foreach ($homeNames as $n) { if (str_contains($lower, $n)) return $slug; }
-            foreach ($awayNames as $n) { if (str_contains($lower, $n)) return $slug; }
+            [$slugHome, $slugAway] = $this->splitHoofootSlug($slug);
+            if ($slugHome === null) continue;
+
+            // Đối chiếu từng vế thay vì str_contains cả chuỗi: 'inter' phải khớp
+            // vế "inter" của Bologna_v_Inter, chứ không khớp "inter_miami".
+            $h = max($this->sideMatch($slugHome, $homeNames), $this->sideMatch($slugAway, $homeNames));
+            $a = max($this->sideMatch($slugHome, $awayNames), $this->sideMatch($slugAway, $awayNames));
+
+            if ($h > 0 && $a > 0) return $slug;
+
+            // Khớp một vế: chỉ nhận khi khớp CHÍNH XÁC (=2). Khớp kiểu tiền tố
+            // (=1) là chỗ Inter_Miami giả dạng Inter, không đủ tin.
+            if (max($h, $a) === 2) $partial[] = $slug;
+        }
+
+        if (count($partial) === 1) return $partial[0];
+
+        if (count($partial) > 1) {
+            Log::info('Hoofoot: bỏ qua vì nhiều slug khớp một phần', [
+                'match'   => $match->slug,
+                'slugs'   => $partial,
+            ]);
         }
 
         return null;

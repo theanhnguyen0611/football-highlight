@@ -18,6 +18,7 @@ class CrawlMatchesCommand extends Command
                             {--min-quota=100 : Dừng khi quota Highlightly còn dưới mức này}
                             {--sync-only : Chỉ chạy Step 1 — nạp match/team/league, bỏ qua video}
                             {--map-limit=100 : Số match tối đa xét mỗi lượt map video}
+                            {--no-dasfootball : Chỉ map Hoofoot — bỏ qua Playwright, nhanh hơn nhiều}
                             {--details-limit=30 : Số match tối đa lấy venue/events mỗi lượt}';
 
     protected $description = 'Sync matches + highlights + videos in one optimized pass';
@@ -93,8 +94,13 @@ class CrawlMatchesCommand extends Command
         $listings = $crawl->crawlHoofootListings();
         $this->line('  Found: ' . count($listings) . ' slugs');
 
-        $this->info('Step 4: Find & map videos (Hoofoot chính, DasFootball backup)...');
-        $mapped = $crawl->findAndMapVideos($listings, limit: $mapLimit, tryDasFootball: true);
+        // DasFootball dùng Playwright, ~5-7s mỗi match không khớp Hoofoot. Sau
+        // backfill lịch sử, số ứng viên lên hàng nghìn nên vòng thu hoạch đầu
+        // nên tắt nó đi; cron sẽ lo phần fallback trên tập nhỏ còn lại.
+        $tryDas = !$this->option('no-dasfootball');
+
+        $this->info('Step 4: Find & map videos (Hoofoot chính' . ($tryDas ? ', DasFootball backup' : ', BỎ DasFootball') . ')...');
+        $mapped = $crawl->findAndMapVideos($listings, limit: $mapLimit, tryDasFootball: $tryDas);
         $this->line("  Mapped: {$mapped} videos");
 
         $this->info('Step 5: Download all pending...');
@@ -103,14 +109,19 @@ class CrawlMatchesCommand extends Command
 
         // Step 5 vừa đánh dấu 'error' cho các video Hoofoot tải hỏng, giờ mới
         // đủ điều kiện để findAndMapVideos() thử DasFootball cho đúng trận đó.
-        $this->info('Step 5b: Fallback DasFootball cho trận Hoofoot hỏng...');
-        $refallback = $crawl->findAndMapVideos($listings, limit: $mapLimit, tryDasFootball: true);
-        if ($refallback > 0) {
-            $this->line("  Mapped: {$refallback} videos");
-            $downloaded = $download->downloadAllPending();
-            $this->line("  Downloaded: {$downloaded} videos");
+        if (!$tryDas) {
+            $this->comment('Step 5b: bỏ qua (--no-dasfootball)');
         } else {
-            $this->line('  Không có trận nào cần fallback');
+            $this->info('Step 5b: Fallback DasFootball cho trận Hoofoot hỏng...');
+            $refallback = $crawl->findAndMapVideos($listings, limit: $mapLimit, tryDasFootball: true);
+
+            if ($refallback > 0) {
+                $this->line("  Mapped: {$refallback} videos");
+                $downloaded = $download->downloadAllPending();
+                $this->line("  Downloaded: {$downloaded} videos");
+            } else {
+                $this->line('  Không có trận nào cần fallback');
+            }
         }
 
         $this->info('Step 6: Download new logos...');
