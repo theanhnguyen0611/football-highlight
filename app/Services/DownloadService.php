@@ -266,64 +266,196 @@ class DownloadService
         return (int) $duration;
     }
 
-    public function downloadYoutube(MatchVideo $video, string $ytUrl): bool
+    // Thư mục đích của một video: full match và highlight nằm khác nhánh.
+    private function outputPaths(MatchVideo $video): array
     {
         $slug = $video->match->slug;
+
         if ($video->video_type === 'full_match') {
-            $outDir  = storage_path("app/public/full-matches/{$slug}");
-            $relBase = "full-matches/{$slug}";
-        } else {
-            $subdir  = $this->highlightSubdir($video);
-            $outDir  = storage_path("app/public/highlights/{$slug}/{$subdir}");
-            $relBase = "highlights/{$slug}/{$subdir}";
+            return [storage_path("app/public/full-matches/{$slug}"), "full-matches/{$slug}"];
         }
+
+        $subdir = $this->highlightSubdir($video);
+        return [storage_path("app/public/highlights/{$slug}/{$subdir}"), "highlights/{$slug}/{$subdir}"];
+    }
+
+    // Một file MP4 → HLS 720p. Dùng chung cho nguồn yt-dlp và nguồn MP4 trực tiếp.
+    // Ép H.264 + AAC để segment MPEG-TS chạy được trên mọi trình duyệt, và hạ
+    // xuống tối đa 720p (nguồn nhỏ hơn thì giữ nguyên, không upscale).
+    private function convertMp4ToHls(MatchVideo $video, string $mp4Path, string $outDir, string $relBase): bool
+    {
+        $segDir = "{$outDir}/720p";
+        if (!is_dir($segDir)) mkdir($segDir, 0755, true);
+
+        // Dọn segment của lần convert trước: nếu lần đó dài hơn, phần thừa sẽ nằm
+        // lại trên đĩa và bị rsync lên SX65 dù index.m3u8 không hề tham chiếu.
+        foreach (glob("{$segDir}/*.ts") ?: [] as $stale) @unlink($stale);
+
+        // Nguồn đã H.264/AAC và <=720p thì chỉ cần remux (-c copy) — nhanh hơn
+        // re-encode hàng chục lần. File MP4 của DasFootball có thể tới 800MB, encode
+        // lại trên 2 vCPU dễ vượt timeout 30 phút của DownloadVideosJob.
+        $info    = $this->probeVideo($mp4Path);
+        $canCopy = $info['vcodec'] === 'h264'
+            && $info['acodec'] === 'aac'
+            && $info['height'] > 0
+            && $info['height'] <= 720;
+
+        $codecArgs = $canCopy
+            ? '-c copy'
+            : sprintf('-vf %s -c:v libx264 -preset fast -crf 23 -c:a aac', escapeshellarg("scale=-2:'min(720,ih)'"));
+
+        Log::info('MP4→HLS', [
+            'video_id' => $video->id,
+            'mode'     => $canCopy ? 'remux (-c copy)' : 're-encode',
+            'source'   => $info,
+        ]);
+
+        $m3u8 = "{$segDir}/index.m3u8";
+        $cmd  = sprintf(
+            'ffmpeg -y -loglevel error -i %s %s -hls_time 10 -hls_list_size 0 '
+            . '-hls_segment_filename %s/seg%%05d.ts %s 2>&1',
+            escapeshellarg($mp4Path),
+            $codecArgs,
+            escapeshellarg($segDir),
+            escapeshellarg($m3u8)
+        );
+        exec($cmd, $out, $code);
+        @unlink($mp4Path);
+
+        $segments = glob("{$segDir}/*.ts") ?: [];
+        if ($code !== 0 || !file_exists($m3u8) || empty($segments)) {
+            Log::error('ffmpeg MP4→HLS lỗi', [
+                'video_id' => $video->id,
+                'output'   => implode("\n", array_slice($out, -5)),
+            ]);
+            return false;
+        }
+
+        // Probe segment .ts đầu tiên, không probe .m3u8 — ffprobe không đọc được
+        // playlist nên sẽ trả rỗng và ghi nhầm RESOLUTION mặc định vào master.
+        $res = $this->probeResolution($segments[0]);
+        file_put_contents(
+            "{$outDir}/master.m3u8",
+            "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION={$res}\n720p/index.m3u8\n"
+        );
+
+        $size = array_sum(array_map('filesize', $segments));
+        $video->markReady("{$relBase}/master.m3u8", round($size / 1024 / 1024, 2), $this->getHlsDuration($outDir));
+
+        return true;
+    }
+
+    // ffprobe trên MPEG-TS in ra một dòng cho mỗi program, nên luôn chỉ lấy dòng đầu.
+    private function ffprobeFirstLine(string $stream, string $entries, string $path, string $sep = ','): string
+    {
+        $out = (string) shell_exec(sprintf(
+            'ffprobe -v error -select_streams %s -show_entries stream=%s -of csv=s=%s:p=0 %s 2>/dev/null',
+            $stream,
+            $entries,
+            $sep,
+            escapeshellarg($path)
+        ));
+
+        return trim(strtok($out, "\n") ?: '');
+    }
+
+    private function probeResolution(string $path): string
+    {
+        $out = $this->ffprobeFirstLine('v:0', 'width,height', $path, 'x');
+
+        return preg_match('/^\d+x\d+$/', $out) ? $out : '1280x720';
+    }
+
+    private function probeVideo(string $path): array
+    {
+        $v = explode(',', $this->ffprobeFirstLine('v:0', 'codec_name,height', $path));
+
+        return [
+            'vcodec' => trim($v[0] ?? ''),
+            'height' => (int) trim($v[1] ?? '0'),
+            'acodec' => $this->ffprobeFirstLine('a:0', 'codec_name', $path),
+        ];
+    }
+
+    // Chỉ tính phần path — query string có thể chứa ".mp4" mà không phải file MP4.
+    private function isMp4Url(string $url): bool
+    {
+        $path = parse_url($url, PHP_URL_PATH) ?: '';
+        return str_ends_with(strtolower($path), '.mp4');
+    }
+
+    // ─── Nguồn MP4 trực tiếp (DasFootball hay trả cdn.videas.fr / cdn.streamain.com) ─
+    public function downloadMp4(MatchVideo $video, string $mp4Url): bool
+    {
+        [$outDir, $relBase] = $this->outputPaths($video);
+        if (!is_dir($outDir)) mkdir($outDir, 0755, true);
+
+        $tmpMp4 = "{$outDir}/source.mp4";
+        if (!$this->curlDownload($mp4Url, $tmpMp4, maxTime: 900)) {
+            Log::error('Tải MP4 lỗi', ['video_id' => $video->id, 'url' => $mp4Url]);
+            return false;
+        }
+
+        return $this->convertMp4ToHls($video, $tmpMp4, $outDir, $relBase);
+    }
+
+    // yt-dlp báo geo-block bằng các câu này — chỉ khi đó mới đáng thử lại qua proxy.
+    private function isGeoBlocked(string $output): bool
+    {
+        foreach ([
+            'not available in your country',
+            'not made this video available in your country',
+            'blocked it in your country',
+            'blocked it on copyright grounds',
+            'geo restriction',
+            'geo-restricted',
+            'available in your location',
+        ] as $needle) {
+            if (stripos($output, $needle) !== false) return true;
+        }
+
+        return false;
+    }
+
+    public function downloadYoutube(MatchVideo $video, string $ytUrl): bool
+    {
+        [$outDir, $relBase] = $this->outputPaths($video);
         if (!is_dir($outDir)) mkdir($outDir, 0755, true);
 
         $tmpMp4 = "{$outDir}/source.mp4";
 
         // Force H.264+AAC so MPEG-TS segments work in all browsers
-        $proxy    = env('UK_PROXY');
-        $proxyArg = $proxy ? '--proxy ' . escapeshellarg($proxy) . ' ' : '';
-        $cmd = sprintf(
-            'yt-dlp -f "bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]" --merge-output-format mp4 --no-playlist --remote-components ejs:github %s-o %s %s 2>&1',
-            $proxyArg,
-            escapeshellarg($tmpMp4),
-            escapeshellarg($ytUrl)
-        );
+        $ytdlp = 'yt-dlp -f "bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]"'
+            . ' --merge-output-format mp4 --no-playlist --remote-components ejs:github';
+
+        // Thử IP thật trước. Proxy chỉ dùng khi YouTube báo đúng lỗi chặn vùng —
+        // IP datacenter (kể cả proxy UK) hay bị YouTube bắt "confirm you're not a
+        // bot", nên gắn proxy vô điều kiện là tự làm hỏng mọi lượt tải.
+        $cmd = sprintf('%s -o %s %s 2>&1', $ytdlp, escapeshellarg($tmpMp4), escapeshellarg($ytUrl));
         exec($cmd, $out, $code);
+
+        $proxy = env('UK_PROXY');
+        if ($code !== 0 && $proxy && $this->isGeoBlocked(implode("\n", $out))) {
+            Log::info('yt-dlp: bị chặn vùng, thử lại qua UK proxy', ['video_id' => $video->id]);
+            @unlink($tmpMp4);
+            $out = [];
+            $cmd = sprintf(
+                '%s --proxy %s -o %s %s 2>&1',
+                $ytdlp,
+                escapeshellarg($proxy),
+                escapeshellarg($tmpMp4),
+                escapeshellarg($ytUrl)
+            );
+            exec($cmd, $out, $code);
+        }
 
         if ($code !== 0 || !file_exists($tmpMp4) || filesize($tmpMp4) === 0) {
-            Log::error("yt-dlp failed for {$ytUrl}", ['output' => implode("\n", $out)]);
+            Log::error("yt-dlp failed for {$ytUrl}", ['output' => implode("\n", array_slice($out, -5))]);
+            @unlink($tmpMp4);
             return false;
         }
 
-        // Convert MP4 → HLS, re-encode video to H.264 nếu cần
-        $segDir = "{$outDir}/720p";
-        if (!is_dir($segDir)) mkdir($segDir, 0755, true);
-
-        $m3u8 = "{$segDir}/index.m3u8";
-        $cmd  = sprintf(
-            'ffmpeg -y -loglevel error -i %s -c:v libx264 -preset fast -crf 23 -c:a aac -hls_time 10 -hls_list_size 0 -hls_segment_filename %s/seg%%05d.ts %s 2>&1',
-            escapeshellarg($tmpMp4),
-            escapeshellarg($segDir),
-            escapeshellarg($m3u8)
-        );
-        exec($cmd, $out, $code);
-        @unlink($tmpMp4);
-
-        if ($code !== 0 || !file_exists($m3u8)) {
-            Log::error("ffmpeg HLS conversion failed for match {$slug}");
-            return false;
-        }
-
-        file_put_contents("{$outDir}/master.m3u8", "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720\n720p/index.m3u8\n");
-
-        $size     = array_sum(array_map('filesize', glob("{$segDir}/*.ts") ?: []));
-        $duration = $this->getHlsDuration($outDir);
-        $video->markReady("{$relBase}/master.m3u8", round($size / 1024 / 1024, 2), $duration);
-
-        Log::info("yt-dlp: downloaded YouTube for match {$slug}");
-        return true;
+        return $this->convertMp4ToHls($video, $tmpMp4, $outDir, $relBase);
     }
 
     public function syncToStorage(MatchVideo $video): void
@@ -413,6 +545,9 @@ class DownloadService
         // tránh curl vô ích lên YouTube và tránh bắt nhầm .m3u8 của live stream.
         if (str_contains($url, '.m3u8')) {
             $ok = $this->downloadHls($video, $url);
+        } elseif ($this->isMp4Url($url)) {
+            // DasFootball hay trả thẳng file MP4 (cdn.videas.fr, cdn.streamain.com)
+            $ok = $this->downloadMp4($video, $url);
         } elseif (
             str_contains($url, 'youtube.com') ||
             str_contains($url, 'youtu.be') ||
@@ -555,10 +690,12 @@ class DownloadService
         return implode("\n", $out);
     }
 
-    private function curlDownload(string $url, string $outPath): bool
+    // $maxTime mặc định hợp cho segment HLS; file MP4 nguyên trận cần nới rộng.
+    private function curlDownload(string $url, string $outPath, int $maxTime = 60): bool
     {
         $cmd = sprintf(
-            'curl -sfL --max-time 60 -H "User-Agent: %s" -H "Accept: */*" -H "Referer: %s" -o %s %s',
+            'curl -sfL --max-time %d -H "User-Agent: %s" -H "Accept: */*" -H "Referer: %s" -o %s %s',
+            $maxTime,
             $this->ua,
             $this->refererFor($url),
             escapeshellarg($outPath),
