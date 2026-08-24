@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\HighlightlyQuotaException;
 use App\Services\CrawlService;
 use App\Services\DownloadService;
 use App\Services\HighlightlyService;
@@ -29,18 +30,23 @@ class CrawlMatchesJob implements ShouldQueue, ShouldBeUnique
     {
         Log::info('CrawlMatchesJob: start (cron mode)');
 
-        // Sync Highlightly today + yesterday
-        for ($i = 0; $i < 2; $i++) {
-            $date   = now()->subDays($i)->format('Y-m-d');
-            $result = $highlightly->syncDate($date);
-            Log::info("CrawlMatchesJob: syncDate {$date}", $result);
-            if ($i === 0) sleep(1);
-        }
+        // Hết quota là chuyện bình thường (backfill vừa ăn hết) — log rồi bỏ qua
+        // phần Highlightly, đừng ném để mỗi 30 phút lại đẻ một failed_job.
+        try {
+            for ($i = 0; $i < 2; $i++) {
+                $date   = now()->subDays($i)->format('Y-m-d');
+                $result = $highlightly->syncDate($date);
+                Log::info("CrawlMatchesJob: syncDate {$date}", $result);
+                if ($i === 0) sleep(1);
+            }
 
-        // Venue + events: cron trước đây không gọi nên trận sync qua cron
-        // không bao giờ có chi tiết (chỉ có khi chạy tay crawl:matches).
-        $detailed = $highlightly->syncFinishedMatchDetails(limit: 30);
-        Log::info('CrawlMatchesJob: details synced', ['count' => $detailed]);
+            // Venue + events: cron trước đây không gọi nên trận sync qua cron
+            // không bao giờ có chi tiết (chỉ có khi chạy tay crawl:matches).
+            $detailed = $highlightly->syncFinishedMatchDetails(limit: 30);
+            Log::info('CrawlMatchesJob: details synced', ['count' => $detailed]);
+        } catch (HighlightlyQuotaException $e) {
+            Log::warning('CrawlMatchesJob: bỏ qua Highlightly, ' . $e->getMessage());
+        }
 
         // Hoofoot: dùng full listings (bao gồm league pages)
         $listings = $crawl->crawlHoofootListings();

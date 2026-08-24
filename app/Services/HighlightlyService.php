@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Exceptions\HighlightlyQuotaException;
 use App\Models\Team;
 use App\Models\League;
 use App\Models\FootballMatch;
@@ -45,9 +46,27 @@ class HighlightlyService
 
     private string $apiKey;
 
+    // Đọc từ header x-ratelimit-* của response gần nhất
+    public ?int $quotaRemaining = null;
+    public ?int $quotaLimit     = null;
+
+    // Dừng trước khi chạm 0 để cron vẫn còn ngân sách chạy tiếp
+    public int $quotaFloor = 100;
+
     public function __construct()
     {
         $this->apiKey = config('services.highlightly.key');
+    }
+
+    private function readQuotaHeaders(array $headers): void
+    {
+        foreach ($headers as $h) {
+            if (preg_match('/^x-ratelimit-requests-remaining:\s*(\d+)/i', $h, $m)) {
+                $this->quotaRemaining = (int) $m[1];
+            } elseif (preg_match('/^x-ratelimit-requests-limit:\s*(\d+)/i', $h, $m)) {
+                $this->quotaLimit = (int) $m[1];
+            }
+        }
     }
 
     private function get(string $endpoint, array $params = []): ?array
@@ -63,10 +82,21 @@ class HighlightlyService
         ]);
 
         $res = @file_get_contents($url, false, $ctx);
+
+        // $http_response_header do file_get_contents set, có cả khi HTTP 4xx/5xx
+        $headers = $http_response_header ?? [];
+        $this->readQuotaHeaders($headers);
+
         if (!$res) {
-            // $http_response_header do file_get_contents set, có cả khi HTTP 4xx/5xx
-            $status = $http_response_header[0] ?? 'no response';
-            Log::warning("Highlightly: request failed", ['endpoint' => $endpoint, 'status' => $status]);
+            $status = $headers[0] ?? 'no response';
+
+            // 429 = hết quota. Phải ném để backfill dừng hẳn thay vì chạy tiếp
+            // hàng trăm ngày với kết quả rỗng.
+            if (str_contains($status, '429')) {
+                throw new HighlightlyQuotaException($this->quotaRemaining, $this->quotaLimit);
+            }
+
+            Log::warning('Highlightly: request failed', ['endpoint' => $endpoint, 'status' => $status]);
             return null;
         }
 
@@ -89,6 +119,11 @@ class HighlightlyService
         $limit = self::PAGE_LIMITS[$endpoint] ?? 100;
 
         for ($page = 0; $page < $maxPages; $page++) {
+            // Chặn trước khi gửi: quota còn dưới sàn thì dừng, đừng để cron chết theo
+            if ($this->quotaRemaining !== null && $this->quotaRemaining <= $this->quotaFloor) {
+                throw new HighlightlyQuotaException($this->quotaRemaining, $this->quotaLimit);
+            }
+
             $res   = $this->get($endpoint, $params + ['limit' => $limit, 'offset' => $page * $limit]);
             $batch = $res['data'] ?? [];
             if (!$batch) break;

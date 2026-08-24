@@ -98,7 +98,7 @@ php artisan key:generate
 echo ""
 echo ">>> EDIT /var/www/bolareel/.env and fill in:"
 echo "    UK_PROXY, CDN_URL, SX65_SSH, SX65_PATH"
-echo "    HIGHLIGHTLY_API_KEY (if any)"
+echo "    HIGHLIGHTLY_KEY"
 echo "Press Enter to continue after editing..."
 read -r
 

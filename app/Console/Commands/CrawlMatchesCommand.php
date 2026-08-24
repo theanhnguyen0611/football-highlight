@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\HighlightlyQuotaException;
 use App\Models\League;
 use App\Models\Team;
 use App\Services\CrawlService;
@@ -13,39 +14,60 @@ class CrawlMatchesCommand extends Command
 {
     protected $signature = 'crawl:matches
                             {--days=3 : Số ngày lịch sử cần sync}
+                            {--offset=0 : Bắt đầu từ N ngày trước (để chạy tiếp backfill dở)}
+                            {--min-quota=100 : Dừng khi quota Highlightly còn dưới mức này}
                             {--sync-only : Chỉ chạy Step 1 — nạp match/team/league, bỏ qua video}
                             {--map-limit=100 : Số match tối đa xét mỗi lượt map video}
                             {--details-limit=30 : Số match tối đa lấy venue/events mỗi lượt}';
 
     protected $description = 'Sync matches + highlights + videos in one optimized pass';
 
-    public function handle(HighlightlyService $highlightly, CrawlService $crawl, DownloadService $download): void
+    public function handle(HighlightlyService $highlightly, CrawlService $crawl, DownloadService $download): int
     {
         $days         = (int) $this->option('days');
+        $offset       = (int) $this->option('offset');
         $mapLimit     = (int) $this->option('map-limit');
         $detailsLimit = (int) $this->option('details-limit');
 
-        $this->info("Step 1: Syncing matches & highlights from Highlightly ({$days} ngày)...");
+        $highlightly->quotaFloor = (int) $this->option('min-quota');
+
+        $this->info("Step 1: Syncing matches & highlights from Highlightly ({$days} ngày, offset {$offset})...");
         $t0 = microtime(true);
         $totalMatches = 0;
+        $i = 0;
 
-        for ($i = 0; $i < $days; $i++) {
-            $date   = now()->subDays($i)->format('Y-m-d');
-            $result = $highlightly->syncDate($date);
-            $totalMatches += $result['matches'];
+        try {
+            for ($i = 0; $i < $days; $i++) {
+                $date   = now()->subDays($offset + $i)->format('Y-m-d');
+                $result = $highlightly->syncDate($date);
+                $totalMatches += $result['matches'];
 
-            // Backfill dài có thể chạy hàng giờ — in tiến độ và ETA để biết còn bao lâu
-            $done = $i + 1;
-            $eta  = (int) ((microtime(true) - $t0) / $done * ($days - $done));
+                // Backfill dài có thể chạy hàng giờ — in tiến độ và ETA để biết còn bao lâu
+                $done = $i + 1;
+                $eta  = (int) ((microtime(true) - $t0) / $done * ($days - $done));
+                $this->line(sprintf(
+                    '  [%d/%d] %s: %d matches, %d thumbnails  (teams=%d, quota=%s, còn ~%dm)',
+                    $done, $days, $date,
+                    $result['matches'], $result['thumbnails'],
+                    Team::count(),
+                    $highlightly->quotaRemaining ?? '?',
+                    (int) round($eta / 60)
+                ));
+
+                if ($i < $days - 1) sleep(1);
+            }
+        } catch (HighlightlyQuotaException $e) {
+            $this->newLine();
+            $this->error($e->getMessage());
+            $this->warn(sprintf('Đã xong %d/%d ngày (tới %s).', $i, $days, now()->subDays($offset + $i)->format('Y-m-d')));
+            $this->warn('Quota reset theo ngày. Mai chạy tiếp bằng:');
             $this->line(sprintf(
-                '  [%d/%d] %s: %d matches, %d thumbnails  (teams=%d, còn ~%dm)',
-                $done, $days, $date,
-                $result['matches'], $result['thumbnails'],
-                Team::count(),
-                (int) round($eta / 60)
+                '  php artisan crawl:matches --days=%d --offset=%d%s',
+                $days - $i,
+                $offset + $i,
+                $this->option('sync-only') ? ' --sync-only' : ''
             ));
-
-            if ($i < $days - 1) sleep(1);
+            return self::FAILURE;
         }
 
         $this->info(sprintf(
@@ -60,7 +82,7 @@ class CrawlMatchesCommand extends Command
         // nên map + download ở đó gần như vô ích và rất tốn thời gian.
         if ($this->option('sync-only')) {
             $this->comment('--sync-only: dừng ở đây, chưa map/tải video.');
-            return;
+            return self::SUCCESS;
         }
 
         $this->info('Step 2: Syncing details for finished matches...');
@@ -101,5 +123,7 @@ class CrawlMatchesCommand extends Command
         $this->call('leagues:set-backgrounds');
 
         $this->info('Done!');
+
+        return self::SUCCESS;
     }
 }
