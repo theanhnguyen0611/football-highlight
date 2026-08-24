@@ -26,7 +26,37 @@ apt-get install -y -qq \
     php8.4-xml php8.4-zip php8.4-gd php8.4-intl php8.4-bcmath \
     php8.4-dom php8.4-opcache \
     mysql-server \
-    git curl unzip supervisor
+    git curl unzip supervisor \
+    ffmpeg rsync
+
+echo "==> [2b/9] Runtime cho pipeline video"
+# ffmpeg  — convert MP4 -> HLS (nhánh DasFootball/YouTube)
+# rsync   — đẩy segment lên SX65
+# deno    — scripts/download-highlight.ts (tải HLS, chọn 720p)
+# node    — build frontend + scripts/*-embed.js (Playwright)
+# yt-dlp  — tải YouTube qua UK proxy
+
+# Node 20 (build Vite + chạy Playwright scripts)
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y -qq nodejs
+
+# Deno (cài vào /usr/local/bin để www-data gọi được)
+curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- -y
+
+# yt-dlp (bản apt quá cũ, YouTube đổi API liên tục -> lấy binary chính chủ)
+curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+    -o /usr/local/bin/yt-dlp
+chmod a+rx /usr/local/bin/yt-dlp
+
+# Chromium cho scripts/hoofoot-embed.js + dasfootball-embed.js.
+# Package `playwright` đã nằm trong devDependencies (npm ci cài sẵn),
+# nhưng browser binary phải tải riêng — chạy ở bước [5/9] sau npm ci.
+#
+# Mặc định Playwright tải về ~/.cache/ms-playwright. Script này chạy bằng
+# root còn queue worker chạy bằng www-data → www-data không đọc được.
+# Ép về thư mục dùng chung, và export cho cả worker lẫn cron.
+export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/ms-playwright
+mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 
 echo "==> [3/9] Install Composer"
 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -50,6 +80,14 @@ else
 fi
 cd "${APP_DIR}"
 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader --no-interaction
+
+# npm ci (không --omit=dev): scripts/*-embed.js cần playwright,
+# vốn nằm trong devDependencies. Rồi build frontend.
+npm ci
+PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/ms-playwright \
+    npx --yes playwright install --with-deps chromium
+chmod -R a+rX /usr/local/share/ms-playwright
+npm run build
 
 echo "==> [6/9] Configure .env"
 cp .env.example .env
@@ -121,6 +159,7 @@ cat > /etc/supervisor/conf.d/bolareel-worker.conf <<SUP
 [program:bolareel-worker]
 process_name=%(program_name)s_%(process_num)02d
 command=php ${APP_DIR}/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+environment=PLAYWRIGHT_BROWSERS_PATH="/usr/local/share/ms-playwright",HOME="/tmp"
 autostart=true
 autorestart=true
 stopasgroup=true
@@ -134,8 +173,16 @@ SUP
 
 supervisorctl reread && supervisorctl update && supervisorctl start bolareel-worker:*
 
-# Cron: Laravel scheduler
-(crontab -l 2>/dev/null; echo "* * * * * www-data cd ${APP_DIR} && php artisan schedule:run >> /dev/null 2>&1") | crontab -
+# Cron: Laravel scheduler.
+# Phải dùng /etc/cron.d — crontab của user KHÔNG có cột user, nên
+# "* * * * * www-data cd ..." sẽ bị cron hiểu www-data là tên lệnh.
+cat > /etc/cron.d/bolareel <<CRON
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/ms-playwright
+HOME=/tmp
+* * * * * www-data cd ${APP_DIR} && php artisan schedule:run >> /dev/null 2>&1
+CRON
+chmod 0644 /etc/cron.d/bolareel
 
 echo ""
 echo "=============================="

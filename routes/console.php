@@ -5,8 +5,11 @@ use App\Jobs\DasFootballJob;
 use App\Jobs\DownloadVideosJob;
 use Illuminate\Support\Facades\Schedule;
 
-// Crawl Highlightly + Hoofoot mỗi 15 phút
-Schedule::job(new CrawlMatchesJob)->everyFifteenMinutes();
+// Crawl Highlightly + Hoofoot mỗi 30 phút.
+// Job này là thứ duy nhất tiêu quota Highlightly (7500 req/ngày):
+// ~24 req cho syncDate 2 ngày + tối đa 30 req cho match details
+// → ~2600 req/ngày ở worst case, ~1600 ở steady state.
+Schedule::job(new CrawlMatchesJob)->everyThirtyMinutes();
 
 // DasFootball fallback mỗi giờ (dùng Playwright, chậm hơn)
 Schedule::job(new DasFootballJob)->hourly();

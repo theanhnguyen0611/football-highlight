@@ -119,12 +119,44 @@ class DownloadService
         return true;
     }
 
+    private function resolutionHeight(string $resolution): int
+    {
+        return preg_match('/\d+x(\d+)/', $resolution, $m) ? (int) $m[1] : 0;
+    }
+
+    // 720p → rendition cao nhất dưới 720p → thấp nhất.
+    // Giống hệt pickQuality() trong scripts/download-highlight.ts để hai nhánh
+    // Deno/curl cho ra cùng một kết quả.
+    private function pickQuality(array $streams): array
+    {
+        foreach ($streams as $s) {
+            if ($s['quality'] === '720p' || $this->resolutionHeight($s['resolution']) === 720) {
+                return $s;
+            }
+        }
+
+        // $streams đã sort bandwidth giảm dần → phần tử đầu là cao nhất còn dưới 720p
+        foreach ($streams as $s) {
+            if ($this->resolutionHeight($s['resolution']) < 720) return $s;
+        }
+
+        return end($streams);
+    }
+
     private function downloadHlsWithCurl(MatchVideo $video, string $masterUrl, string $outDir, string $relBase): bool
     {
         $streams = $this->getStreams($masterUrl);
         if (empty($streams)) {
             $streams = [['quality' => 'default', 'url' => $masterUrl, 'bandwidth' => 0, 'resolution' => 'unknown']];
         }
+
+        // Chỉ giữ 1 rendition — tải hết mọi chất lượng tốn 2-3x dung lượng SX65
+        $streams = [$this->pickQuality($streams)];
+        Log::info('HLS: chọn rendition', [
+            'video_id'   => $video->id,
+            'quality'    => $streams[0]['quality'],
+            'resolution' => $streams[0]['resolution'],
+        ]);
 
         $totalSize     = 0;
         $totalDuration = 0;
