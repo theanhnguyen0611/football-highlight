@@ -43,14 +43,6 @@ class DownloadVideosCommand extends Command
                 $download->syncToStorage($video);
                 $video->refresh();
                 $this->info("  Done: {$video->file_size_mb} MB, {$video->duration_seconds}s");
-
-                $match = $video->match;
-                $total = $match->videos()->count();
-                $ready = $match->videos()->where('status', 'ready')->count();
-                if ($total > 0 && $total === $ready) {
-                    $match->markReady();
-                    $this->info("  Match ready: {$slug}");
-                }
             } catch (\Exception $e) {
                 $this->error("  Error: " . $e->getMessage());
                 $video->markError();
