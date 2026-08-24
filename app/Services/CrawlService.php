@@ -360,7 +360,7 @@ class CrawlService
         $matches = FootballMatch::with(['homeTeam', 'awayTeam', 'videos'])
             ->where('match_status', 'finished')
             ->whereIn(\DB::raw('DATE(match_date)'), array_keys($slugsByDate))
-            ->orderByRaw("(SELECT COUNT(*) FROM match_videos WHERE match_videos.match_id = football_matches.id AND status IN ('pending','ready')) ASC")
+            ->orderByRaw("(SELECT COUNT(*) FROM match_videos WHERE match_videos.match_id = matches.id AND status IN ('pending','ready')) ASC")
             ->limit($limit)
             ->get();
 
