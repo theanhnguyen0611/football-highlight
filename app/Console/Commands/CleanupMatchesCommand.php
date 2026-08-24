@@ -36,40 +36,47 @@ class CleanupMatchesCommand extends Command
             $this->pruneDasFootball($dryRun);
         }
 
-        $matches = FootballMatch::with('videos')
-            ->where('match_date', '<', $cutoff)
-            ->get()
-            ->filter(fn ($m) => $m->videos->where('status', 'ready')->isEmpty());
+        // Lọc bằng SQL chứ không ->get()->filter(): sau backfill lịch sử, bảng
+        // matches có thể tới hàng chục nghìn dòng và nạp hết vào RAM sẽ chết.
+        $query = FootballMatch::where('match_date', '<', $cutoff)
+            ->whereDoesntHave('videos', fn ($q) => $q->where('status', 'ready'));
 
-        $this->info("Found {$matches->count()} matches older than {$days} days with no ready video.");
+        $total = $query->count();
+        $this->info("Found {$total} matches older than {$days} days with no ready video.");
 
-        if ($matches->isEmpty()) {
+        if ($total === 0) {
             $this->info('Nothing to clean up.');
+            return;
+        }
+
+        if ($dryRun) {
+            $query->clone()->orderBy('match_date')->limit(20)->get()
+                ->each(fn ($m) => $this->line("  [{$m->match_date->format('Y-m-d')}] {$m->slug}"));
+            if ($total > 20) $this->line('  ... và ' . ($total - 20) . ' trận nữa');
+            $this->warn("Would delete {$total} matches (bỏ --dry-run để thực hiện).");
             return;
         }
 
         $deletedMatches = 0;
         $deletedFiles   = 0;
+        $bar = $this->output->createProgressBar($total);
 
-        foreach ($matches as $match) {
-            $label = "[{$match->match_date->format('Y-m-d')}] {$match->slug} (ID: {$match->id})";
-            $this->line("  {$label}");
-
-            if (!$dryRun) {
+        $query->with('videos')->chunkById(200, function ($chunk) use (&$deletedMatches, &$deletedFiles, $bar) {
+            foreach ($chunk as $match) {
                 $deletedFiles += $this->deleteFiles($match);
                 $match->videos()->delete();
                 $match->events()->delete();
                 $match->delete();
+
+                $deletedMatches++;
+                $bar->advance();
             }
+        });
 
-            $deletedMatches++;
-        }
-
-        if ($dryRun) {
-            $this->warn("Would delete {$deletedMatches} matches (use without --dry-run to apply).");
-        } else {
-            $this->info("Deleted {$deletedMatches} matches, removed {$deletedFiles} file(s).");
-        }
+        $bar->finish();
+        $this->newLine(2);
+        $this->info("Deleted {$deletedMatches} matches, removed {$deletedFiles} file(s).");
+        $this->comment('Teams và leagues KHÔNG bị xoá — dữ liệu backfill được giữ nguyên.');
     }
 
     private function pruneDasFootball(bool $dryRun): void
@@ -113,16 +120,19 @@ class CleanupMatchesCommand extends Command
         $count = 0;
         $slug  = $match->slug;
 
+        // syncToStorage() chỉ chạy sau khi tải xong, nên trận chưa từng có video
+        // ready thì trên SX65 không có gì. Không kiểm tra điều này thì mỗi trận
+        // tốn 2 lần ssh — dọn 10k trận sau backfill là 20k round-trip vô ích.
+        $everSynced = $match->videos->contains(fn ($v) => !empty($v->local_path));
+
         foreach (["highlights/{$slug}", "full-matches/{$slug}"] as $relDir) {
             $localDir = storage_path("app/public/{$relDir}");
             if (is_dir($localDir)) {
                 File::deleteDirectory($localDir);
-                $this->line("      local: {$relDir}");
                 $count++;
             }
 
-            if ($this->downloader->deleteFromStorage($relDir)) {
-                $this->line("      sx65 : {$relDir}");
+            if ($everSynced && $this->downloader->deleteFromStorage($relDir)) {
                 $count++;
             }
         }
