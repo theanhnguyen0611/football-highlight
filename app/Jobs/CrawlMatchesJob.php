@@ -32,8 +32,8 @@ class CrawlMatchesJob implements ShouldQueue
         }
 
         // Hoofoot + DasFootball: mỗi source check độc lập, skip nếu đã có
-        $listings   = $crawl->crawlHoofootRecentSlugs(days: 2);
-        $mapped     = $crawl->findAndMapVideos($listings, limit: 30, tryDasFootball: true);
+        $listings   = $crawl->crawlHoofootRecentSlugs(days: 3);
+        $mapped     = $crawl->findAndMapVideos($listings, limit: 80, tryDasFootball: true);
         $downloaded = $download->downloadAllPending();
 
         Log::info('CrawlMatchesJob: done', ['mapped' => $mapped, 'downloaded' => $downloaded]);
