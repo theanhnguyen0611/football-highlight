@@ -75,10 +75,16 @@ class CrawlService
             '/<iframe[^>]+src=["\']([^"\']+)["\'][^>]*>/i',
         ];
 
+        $blocked = ['dailymotion.com', 'facebook.com', 'twitter.com', 'tiktok.com'];
+
         foreach ($selectors as $pattern) {
             if (preg_match($pattern, $html, $m)) {
                 $url = html_entity_decode($m[1]);
                 if (!$url || !str_starts_with($url, 'http')) continue;
+
+                foreach ($blocked as $domain) {
+                    if (str_contains($url, $domain)) continue 2;
+                }
 
                 // Streamable 404 = placeholder/deleted → skip, dùng Playwright thay
                 if (str_contains($url, 'streamable.com') && $this->headStatus($url) !== 200) {

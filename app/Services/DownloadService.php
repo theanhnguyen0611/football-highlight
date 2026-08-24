@@ -295,15 +295,29 @@ class DownloadService
         $relDir   = dirname($video->local_path);
         $localDir = storage_path("app/public/{$relDir}");
 
-        $cmd = sprintf(
-            'rsync -az --mkpath --no-perms %s/ %s:%s/%s/ && rm -rf %s',
+        $rsync = sprintf(
+            'rsync -az --mkpath --no-perms %s/ %s:%s/%s/ 2>&1',
             escapeshellarg($localDir),
             $ssh,
             $base,
-            $relDir,
-            escapeshellarg($localDir)
+            $relDir
         );
-        shell_exec($cmd);
+        $output   = [];
+        $exitCode = 0;
+        exec($rsync, $output, $exitCode);
+
+        if ($exitCode !== 0) {
+            Log::error('syncToStorage rsync failed', [
+                'video_id' => $video->id,
+                'local'    => $localDir,
+                'remote'   => "{$ssh}:{$base}/{$relDir}",
+                'output'   => implode("\n", $output),
+            ]);
+            return;
+        }
+
+        shell_exec('rm -rf ' . escapeshellarg($localDir));
+        Log::info('syncToStorage done', ['video_id' => $video->id, 'path' => $relDir]);
     }
 
     public function downloadAllPending(): int
@@ -435,7 +449,15 @@ class DownloadService
         $result = [];
         foreach ($lines as $line) {
             $line = trim($line);
-            if ($line && !str_starts_with($line, '#')) {
+            if (str_starts_with($line, '#EXT-X-MAP:')) {
+                // Rewrite init segment URI to local filename
+                $rewritten = preg_replace_callback(
+                    '/#EXT-X-MAP:URI="([^"]+)"/',
+                    fn($m) => '#EXT-X-MAP:URI="' . basename(parse_url($m[1], PHP_URL_PATH)) . '"',
+                    $line
+                );
+                $result[] = $rewritten;
+            } elseif ($line && !str_starts_with($line, '#')) {
                 preg_match('/\/([^\/\?]+\.ts)/', $line, $m);
                 $result[] = $m[1] ?? basename(parse_url($line, PHP_URL_PATH));
             } else {
