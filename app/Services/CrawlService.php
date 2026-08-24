@@ -409,7 +409,7 @@ class CrawlService
 
     // Hoofoot dùng tên viết tắt cho một số team — map từ tên DB chuẩn (đã bỏ dấu) sang alias Hoofoot
     private const HOOFOOT_ALIASES = [
-        'paris_saint_germain'         => ['psg'],
+        'paris_saint_germain'         => ['psg', 'paris_sg'],
         'internazionale'              => ['inter', 'inter_milan'],
         'wolverhampton_wanderers'     => ['wolves'],
         'tottenham_hotspur'           => ['spurs'],
