@@ -1,13 +1,17 @@
 <?php
 
 use App\Jobs\CrawlMatchesJob;
+use App\Jobs\DasFootballJob;
 use App\Jobs\DownloadVideosJob;
 use Illuminate\Support\Facades\Schedule;
 
-// Crawl sitemap mỗi 15 phút
+// Crawl Highlightly + Hoofoot mỗi 15 phút
 Schedule::job(new CrawlMatchesJob)->everyFifteenMinutes();
 
-// Download videos mỗi 5 phút
+// DasFootball fallback mỗi giờ (dùng Playwright, chậm hơn)
+Schedule::job(new DasFootballJob)->hourly();
+
+// Download videos mỗi 15 phút
 Schedule::job(new DownloadVideosJob)->everyFifteenMinutes();
 
 // Dọn matches cũ > 14 ngày không có video, chạy mỗi đêm lúc 3:00 AM

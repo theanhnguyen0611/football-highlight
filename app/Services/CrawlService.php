@@ -409,17 +409,33 @@ class CrawlService
 
     private function findMatchingSlug(FootballMatch $match, array $slugs): ?string
     {
-        $homeName = strtolower(str_replace([' ', '.', '-'], '_', $match->homeTeam->name));
-        $awayName = strtolower(str_replace([' ', '.', '-'], '_', $match->awayTeam->name));
+        $homeWords = $this->significantWords($match->homeTeam->name);
+        $awayWords = $this->significantWords($match->awayTeam->name);
+
+        $bestSlug  = null;
+        $bestScore = 0;
 
         foreach ($slugs as $slug) {
             $lower = strtolower($slug);
-            if (str_contains($lower, $homeName) || str_contains($lower, $awayName)) {
-                return $slug;
+            $score = 0;
+            foreach ($homeWords as $w) { if (str_contains($lower, $w)) $score++; }
+            foreach ($awayWords as $w) { if (str_contains($lower, $w)) $score++; }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestSlug  = $slug;
             }
         }
 
-        return null;
+        // Yêu cầu ít nhất 1 từ khớp từ mỗi team, hoặc 2 từ từ 1 team
+        return $bestScore >= 2 ? $bestSlug : null;
+    }
+
+    private function significantWords(string $name): array
+    {
+        // Bỏ suffix phổ biến, giữ lại từ có nghĩa
+        $stop = ['fc', 'cf', 'sc', 'ac', 'rc', 'if', 'de', 'afc', 'bsc', 'vfl', 'fsv', 'tsg', 'vfb', 'sv'];
+        $words = preg_split('/[\s.\-\/]+/', strtolower($name));
+        return array_values(array_filter($words, fn($w) => strlen($w) >= 3 && !in_array($w, $stop)));
     }
 
     // ─── Crawl dasfootball.com (Next.js JS-rendered) via Playwright ─

@@ -16,10 +16,10 @@ class CrawlMatchesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 600;
+    public int $timeout = 900;
     public int $tries   = 1;
 
-    public function handle(HighlightlyService $highlightly, CrawlService $crawl, DownloadService $download): void
+    public function handle(HighlightlyService $highlightly, CrawlService $crawl): void
     {
         Log::info('CrawlMatchesJob: start (cron mode)');
 
@@ -31,11 +31,13 @@ class CrawlMatchesJob implements ShouldQueue
             if ($i === 0) sleep(1);
         }
 
-        // Hoofoot + DasFootball: mỗi source check độc lập, skip nếu đã có
-        $listings   = $crawl->crawlHoofootRecentSlugs(days: 3);
-        $mapped     = $crawl->findAndMapVideos($listings, limit: 80, tryDasFootball: true);
-        $downloaded = $download->downloadAllPending();
+        // Hoofoot: dùng full listings (bao gồm league pages)
+        $listings = $crawl->crawlHoofootListings();
+        Log::info('CrawlMatchesJob: listings', ['count' => count($listings)]);
 
-        Log::info('CrawlMatchesJob: done', ['mapped' => $mapped, 'downloaded' => $downloaded]);
+        // DasFootball chạy riêng trong DasFootballJob — không gọi ở đây
+        $mapped = $crawl->findAndMapVideos($listings, limit: 60, tryDasFootball: false);
+
+        Log::info('CrawlMatchesJob: done', ['mapped' => $mapped]);
     }
 }
