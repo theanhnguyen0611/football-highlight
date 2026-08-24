@@ -470,8 +470,8 @@ async function loadVideo(video) {
     try {
         const res = await fetch(`/api/videos/${video.id}/stream`)
         if (!res.ok) { tryNextVideo(); return }
-        const { stream_url } = await res.json()
-        if (stream_url) playHls(stream_url)
+        const { stream_url, cdn_token, cdn_expires, cdn_token_path } = await res.json()
+        if (stream_url) playHls(stream_url, { cdn_token, cdn_expires, cdn_token_path })
         else tryNextVideo()
     } catch {
         tryNextVideo()
@@ -486,19 +486,29 @@ function tryNextVideo() {
     }
 }
 
-function playHls(url) {
+function playHls(url, cdnAuth = {}) {
     if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null }
     const media = plyrInstance?.media ?? videoEl.value
     if (!media) return
 
+    const { cdn_token, cdn_expires, cdn_token_path } = cdnAuth
+    const hlsConfig = {
+        enableWorker: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 30,
+        maxBufferSize: 20 * 1000 * 1000,
+        backBufferLength: 0,
+    }
+
+    if (cdn_token) {
+        hlsConfig.xhrSetup = (xhr, reqUrl) => {
+            const sep = reqUrl.includes('?') ? '&' : '?'
+            xhr.open('GET', `${reqUrl}${sep}token=${cdn_token}&expires=${cdn_expires}&token_path=${encodeURIComponent(cdn_token_path)}`)
+        }
+    }
+
     if (Hls.isSupported()) {
-        hlsInstance = new Hls({
-            enableWorker: true,
-            maxBufferLength: 30,        // tối đa 30s buffer phía trước
-            maxMaxBufferLength: 30,     // không tự tăng lên hơn 30s
-            maxBufferSize: 20 * 1000 * 1000, // 20MB
-            backBufferLength: 0,        // không giữ buffer phía sau
-        })
+        hlsInstance = new Hls(hlsConfig)
 
         hlsInstance.on(Hls.Events.ERROR, (event, data) => {
             console.error('[hls] error', data.type, data.details, data)

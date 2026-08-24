@@ -45,8 +45,9 @@ return [
     ],
 
     'cdn' => [
-        'url'      => env('CDN_URL'),
-        'sx65_ssh' => env('SX65_SSH'),
+        'url'       => env('CDN_URL'),
+        'token_key' => env('BUNNY_TOKEN_KEY'),
+        'sx65_ssh'  => env('SX65_SSH'),
         'sx65_path' => env('SX65_PATH', '/storage/bolareel'),
     ],
 

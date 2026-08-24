@@ -116,25 +116,35 @@ async function fetchAndPlayHls(video) {
         const res = await fetch(`/api/videos/${video.id}/stream`)
         if (!res.ok) return
         const data = await res.json()
-        if (data.stream_url) playHls(data.stream_url)
+        if (data.stream_url) playHls(data.stream_url, data)
     } catch (e) {
         console.error('Stream error', e)
     }
 }
 
-function playHls(url) {
+function playHls(url, cdnAuth = {}) {
     if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null }
     const media = plyrInstance?.media ?? videoEl.value
     if (!media) return
 
+    const { cdn_token, cdn_expires, cdn_token_path } = cdnAuth
+    const hlsConfig = {
+        enableWorker: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 30,
+        maxBufferSize: 20 * 1000 * 1000,
+        backBufferLength: 0,
+    }
+
+    if (cdn_token) {
+        hlsConfig.xhrSetup = (xhr, reqUrl) => {
+            const sep = reqUrl.includes('?') ? '&' : '?'
+            xhr.open('GET', `${reqUrl}${sep}token=${cdn_token}&expires=${cdn_expires}&token_path=${encodeURIComponent(cdn_token_path)}`)
+        }
+    }
+
     if (Hls.isSupported()) {
-        hlsInstance = new Hls({
-            enableWorker: true,
-            maxBufferLength: 30,
-            maxMaxBufferLength: 30,
-            maxBufferSize: 20 * 1000 * 1000,
-            backBufferLength: 0,
-        })
+        hlsInstance = new Hls(hlsConfig)
         hlsInstance.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
                 if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hlsInstance.startLoad()
