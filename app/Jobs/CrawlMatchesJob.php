@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 class CrawlMatchesJob implements ShouldQueue
@@ -42,6 +43,11 @@ class CrawlMatchesJob implements ShouldQueue
 
         // DasFootball chạy riêng trong DasFootballJob — không gọi ở đây
         $mapped = $crawl->findAndMapVideos($listings, limit: 60, tryDasFootball: false);
+
+        // Thumbnail lưu trên web server, không đẩy sang SX65 — ảnh nhỏ, nginx
+        // serve trực tiếp rẻ hơn đi vòng qua CDN.
+        Artisan::call('thumbnails:download');
+        Artisan::call('logos:download');
 
         Log::info('CrawlMatchesJob: done', ['mapped' => $mapped]);
     }

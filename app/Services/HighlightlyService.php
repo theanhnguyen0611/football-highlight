@@ -135,7 +135,7 @@ class HighlightlyService
     public function syncDate(string $date): array
     {
         $matchCount = 0;
-        $videoCount = 0;
+        $thumbCount = 0;
 
         // Bước A: lấy matches theo ngày — chỉ lưu khi finished + có score
         foreach ($this->getAll('/matches', ['date' => $date]) as $m) {
@@ -147,19 +147,33 @@ class HighlightlyService
 
         sleep(1);
 
-        // Bước B: lấy highlights — upsert match nếu chưa có, cũng chỉ khi finished + có score
+        // Bước B: lấy thumbnail từ /highlights.
+        //
+        // Trước đây bước này lọc `state.description` + score rồi mới upsert match,
+        // nhưng object `match` của /highlights KHÔNG có hai field đó (chỉ có id,
+        // date, round, country, teams, league) — nên mọi highlight đều bị loại và
+        // bước B chưa bao giờ làm được gì. Giờ chỉ gắn thumbnail vào match đã được
+        // bước A xác thực, không tạo match mới từ payload thiếu dữ liệu.
         foreach ($this->getAll('/highlights', ['date' => $date]) as $h) {
             $md = $h['match'] ?? null;
-            if (!$md || !in_array($md['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
-            if ($this->mapStatus($md['state']['description'] ?? null) !== 'finished') continue;
-            if (!$this->hasScore($md)) continue;
-            if (!FootballMatch::where('highlightly_id', $md['id'])->exists()) {
-                if ($this->upsertMatch($md)) $videoCount++;
-            }
+            if (!$md || empty($h['imgUrl'])) continue;
+            if (!in_array($md['league']['id'] ?? null, self::TOP_LEAGUE_IDS, true)) continue;
+
+            // 'goal-clip' / 'other' là clip lẻ — ảnh không đại diện cho trận
+            if (($h['category'] ?? null) !== 'match-highlights') continue;
+
+            $match = FootballMatch::where('highlightly_id', $md['id'])->first();
+            if (!$match) continue;
+
+            // Chỉ set lần đầu; getRawOriginal() để không đụng accessor
+            if ($match->getRawOriginal('thumbnail_url')) continue;
+
+            $match->update(['thumbnail_url' => $h['imgUrl']]);
+            $thumbCount++;
         }
 
-        Log::info("Highlightly: syncDate {$date} → {$matchCount} matches, {$videoCount} from highlights");
-        return ['matches' => $matchCount, 'highlights' => $videoCount];
+        Log::info("Highlightly: syncDate {$date} → {$matchCount} matches, {$thumbCount} thumbnails");
+        return ['matches' => $matchCount, 'thumbnails' => $thumbCount];
     }
 
     // ─── Sync venue + events cho finished matches chưa được detail ───

@@ -20,7 +20,7 @@ class CrawlMatchesCommand extends Command
         for ($i = 0; $i < $days; $i++) {
             $date   = now()->subDays($i)->format('Y-m-d');
             $result = $highlightly->syncDate($date);
-            $this->line("  {$date}: {$result['matches']} matches, {$result['highlights']} highlights");
+            $this->line("  {$date}: {$result['matches']} matches, {$result['thumbnails']} thumbnails");
             if ($i < $days - 1) sleep(1);
         }
 
@@ -54,6 +54,9 @@ class CrawlMatchesCommand extends Command
 
         $this->info('Step 6: Download new logos...');
         $this->call('logos:download');
+
+        $this->info('Step 6b: Download thumbnails (lưu trên web server)...');
+        $this->call('thumbnails:download');
 
         $this->info('Step 7: Set league backgrounds...');
         $this->call('leagues:set-backgrounds');

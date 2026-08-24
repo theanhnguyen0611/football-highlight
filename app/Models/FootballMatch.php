@@ -4,6 +4,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class FootballMatch extends Model
@@ -22,6 +23,18 @@ class FootballMatch extends Model
         'statistics'        => 'array',
         'details_synced_at' => 'datetime',
     ];
+
+    // Cột thumbnail_url giữ giá trị thô: URL http từ Highlightly khi mới sync, đổi
+    // thành tên file sau khi thumbnails:download tải về web server. Giống cách
+    // logo_path/logo_url hoạt động ở Team và League.
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        $raw = $this->attributes['thumbnail_url'] ?? null;
+        if (!$raw) return null;
+        if (str_starts_with($raw, 'http')) return $raw;
+
+        return Storage::url('thumbnails/' . $raw);
+    }
 
     public function homeTeam(): BelongsTo
     {

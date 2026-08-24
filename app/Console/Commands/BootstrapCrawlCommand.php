@@ -20,7 +20,7 @@ class BootstrapCrawlCommand extends Command
         for ($i = 0; $i < $days; $i++) {
             $date   = now()->subDays($i)->format('Y-m-d');
             $result = $highlightly->syncDate($date);
-            $this->line("  {$date}: {$result['matches']} matches, {$result['highlights']} highlights");
+            $this->line("  {$date}: {$result['matches']} matches, {$result['thumbnails']} thumbnails");
             if ($i < $days - 1) sleep(1);
         }
 
