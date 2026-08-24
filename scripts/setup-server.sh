@@ -30,18 +30,14 @@ apt-get install -y -qq \
     ffmpeg rsync
 
 echo "==> [2b/9] Runtime cho pipeline video"
-# ffmpeg  — convert MP4 -> HLS (nhánh DasFootball/YouTube)
+# ffmpeg  — tải HLS + convert MP4 -> HLS (mọi nhánh download)
 # rsync   — đẩy segment lên SX65
-# deno    — scripts/download-highlight.ts (tải HLS, chọn 720p)
 # node    — build frontend + scripts/*-embed.js (Playwright)
 # yt-dlp  — tải YouTube qua UK proxy
 
 # Node 20 (build Vite + chạy Playwright scripts)
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y -qq nodejs
-
-# Deno (cài vào /usr/local/bin để www-data gọi được)
-curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- -y
 
 # yt-dlp (bản apt quá cũ, YouTube đổi API liên tục -> lấy binary chính chủ)
 curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \

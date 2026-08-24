@@ -62,6 +62,10 @@ class DownloadService
         return $streams;
     }
 
+    // ─── Tải HLS: chọn 720p rồi để ffmpeg kéo + cắt segment ──────────
+    // ffmpeg tải cả stream trong một tiến trình, tái sử dụng kết nối. Bản cũ
+    // lặp curl từng segment (một process mỗi segment) mất 436s cho video mà
+    // ffmpeg làm trong 150s.
     public function downloadHls(MatchVideo $video, string $masterUrl): bool
     {
         $slug    = $video->match->slug;
@@ -70,52 +74,67 @@ class DownloadService
         $relBase = "highlights/{$slug}/{$subdir}";
         if (!is_dir($outDir)) mkdir($outDir, 0755, true);
 
-        $denoScript = base_path('scripts/download-highlight.ts');
-        if (is_file($denoScript) && $this->denoAvailable()) {
-            return $this->downloadHlsWithDeno($video, $masterUrl, $outDir, $relBase);
+        $streams = $this->getStreams($masterUrl);
+        if (empty($streams)) {
+            // Playlist một tầng — không có master, dùng thẳng
+            $streams = [['quality' => 'default', 'url' => $masterUrl, 'bandwidth' => 0, 'resolution' => 'unknown']];
         }
 
-        return $this->downloadHlsWithCurl($video, $masterUrl, $outDir, $relBase);
-    }
+        $stream  = $this->pickQuality($streams);
+        $quality = $stream['quality'];
+        $segDir  = "{$outDir}/{$quality}";
+        if (!is_dir($segDir)) mkdir($segDir, 0755, true);
 
-    private function denoAvailable(): bool
-    {
-        exec('deno --version 2>&1', $out, $code);
-        return $code === 0;
-    }
+        // Dọn segment lần trước: lần đó dài hơn thì phần thừa nằm lại và bị
+        // rsync lên SX65 dù playlist không tham chiếu.
+        foreach (glob("{$segDir}/*.ts") ?: [] as $stale) @unlink($stale);
 
-    private function downloadHlsWithDeno(MatchVideo $video, string $masterUrl, string $outDir, string $relBase): bool
-    {
-        $script = base_path('scripts/download-highlight.ts');
-        $cmd    = sprintf(
-            'deno run --allow-net --allow-write --allow-read --allow-run=ffmpeg %s %s %s 2>&1',
-            escapeshellarg($script),
-            escapeshellarg($masterUrl),
-            escapeshellarg($outDir)
+        Log::info('HLS: chọn rendition', [
+            'video_id'   => $video->id,
+            'quality'    => $quality,
+            'resolution' => $stream['resolution'],
+        ]);
+
+        $m3u8 = "{$segDir}/index.m3u8";
+        $cmd  = sprintf(
+            'ffmpeg -y -loglevel error -user_agent %s -headers %s -i %s -c copy '
+            . '-hls_time 10 -hls_list_size 0 -hls_segment_filename %s/seg%%05d.ts %s 2>&1',
+            escapeshellarg($this->ua),
+            escapeshellarg("Referer: {$this->refererFor($stream['url'])}\r\n"),
+            escapeshellarg($stream['url']),
+            escapeshellarg($segDir),
+            escapeshellarg($m3u8)
         );
 
-        $output   = [];
-        $exitCode = 0;
-        exec($cmd, $output, $exitCode);
+        $out  = [];
+        $code = 0;
+        exec($cmd, $out, $code);
 
-        if ($exitCode !== 0 || !file_exists("{$outDir}/master.m3u8")) {
-            Log::error('Deno HLS download failed', ['output' => implode("\n", $output)]);
+        $segments = glob("{$segDir}/*.ts") ?: [];
+        if ($code !== 0 || !file_exists($m3u8) || empty($segments)) {
+            Log::error('HLS download lỗi', [
+                'video_id' => $video->id,
+                'master'   => $masterUrl,
+                'output'   => implode("\n", array_slice($out, -5)),
+            ]);
             return false;
         }
 
-        // Parse output for size ("Done! X MB saved to:")
-        $sizeMb = 0;
-        foreach ($output as $line) {
-            if (preg_match('/Done!\s+([\d.]+)\s+MB/', $line, $m)) {
-                $sizeMb = (float) $m[1];
-                break;
-            }
-        }
+        $res = $stream['resolution'] !== 'unknown'
+            ? $stream['resolution']
+            : $this->probeResolution($segments[0]);
 
-        $duration = $this->getHlsDuration($outDir);
-        $video->markReady("{$relBase}/master.m3u8", $sizeMb, $duration);
+        file_put_contents(
+            "{$outDir}/master.m3u8",
+            "#EXTM3U\n#EXT-X-VERSION:3\n"
+            . "#EXT-X-STREAM-INF:BANDWIDTH={$stream['bandwidth']},RESOLUTION={$res}\n"
+            . "{$quality}/index.m3u8\n"
+        );
 
-        Log::info('Deno HLS download complete', ['video_id' => $video->id, 'size_mb' => $sizeMb]);
+        $size = array_sum(array_map('filesize', $segments));
+        $video->markReady("{$relBase}/master.m3u8", round($size / 1024 / 1024, 2), $this->getHlsDuration($outDir));
+
+        Log::info('HLS download xong', ['video_id' => $video->id, 'size_mb' => round($size / 1024 / 1024, 2)]);
         return true;
     }
 
@@ -125,8 +144,6 @@ class DownloadService
     }
 
     // 720p → rendition cao nhất dưới 720p → thấp nhất.
-    // Giống hệt pickQuality() trong scripts/download-highlight.ts để hai nhánh
-    // Deno/curl cho ra cùng một kết quả.
     private function pickQuality(array $streams): array
     {
         foreach ($streams as $s) {
@@ -141,115 +158,6 @@ class DownloadService
         }
 
         return end($streams);
-    }
-
-    private function downloadHlsWithCurl(MatchVideo $video, string $masterUrl, string $outDir, string $relBase): bool
-    {
-        $streams = $this->getStreams($masterUrl);
-        if (empty($streams)) {
-            $streams = [['quality' => 'default', 'url' => $masterUrl, 'bandwidth' => 0, 'resolution' => 'unknown']];
-        }
-
-        // Chỉ giữ 1 rendition — tải hết mọi chất lượng tốn 2-3x dung lượng SX65
-        $streams = [$this->pickQuality($streams)];
-        Log::info('HLS: chọn rendition', [
-            'video_id'   => $video->id,
-            'quality'    => $streams[0]['quality'],
-            'resolution' => $streams[0]['resolution'],
-        ]);
-
-        $totalSize     = 0;
-        $totalDuration = 0;
-        $okStreams     = [];
-
-        foreach ($streams as $stream) {
-            $quality    = $stream['quality'];
-            $segmentDir = "{$outDir}/{$quality}";
-            if (!is_dir($segmentDir)) mkdir($segmentDir, 0755, true);
-
-            $playlist = $this->curlGet($stream['url']);
-            if (!$this->isPlaylist($playlist)) {
-                Log::warning('HLS: response không phải playlist', [
-                    'video_id' => $video->id,
-                    'url'      => $stream['url'],
-                ]);
-                continue;
-            }
-
-            file_put_contents("{$segmentDir}/playlist.m3u8", $playlist);
-
-            $lines    = explode("\n", trim($playlist));
-            $base     = substr($stream['url'], 0, strrpos($stream['url'], '/') + 1);
-            $segments = [];
-            $duration = 0;
-
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if (str_starts_with($line, '#EXTINF:')) {
-                    preg_match('/#EXTINF:([\d.]+)/', $line, $m);
-                    $duration += (float) ($m[1] ?? 0);
-                }
-                // Download init segment từ #EXT-X-MAP (CMAF/fMP4 format)
-                if (str_starts_with($line, '#EXT-X-MAP:')) {
-                    preg_match('/#EXT-X-MAP:URI="([^"]+)"/', $line, $m);
-                    if (!empty($m[1])) {
-                        $initUri  = $m[1];
-                        $initUrl  = str_starts_with($initUri, 'http') ? $initUri : $base . $initUri;
-                        $initName = basename(parse_url($initUrl, PHP_URL_PATH));
-                        if ($initName) $this->curlDownload($initUrl, "{$segmentDir}/{$initName}");
-                    }
-                }
-                if ($line && !str_starts_with($line, '#')) {
-                    $segments[] = str_starts_with($line, 'http') ? $line : $base . $line;
-                }
-            }
-
-            $gotSegments = 0;
-            foreach ($segments as $idx => $segUrl) {
-                $segName = basename(parse_url($segUrl, PHP_URL_PATH)) ?: "seg_{$idx}.ts";
-                $segPath = "{$segmentDir}/{$segName}";
-                if (file_exists($segPath) && filesize($segPath) > 0) {
-                    $totalSize += filesize($segPath);
-                    $gotSegments++;
-                    continue;
-                }
-                if ($this->curlDownload($segUrl, $segPath)) {
-                    $totalSize += filesize($segPath);
-                    $gotSegments++;
-                }
-            }
-
-            // Stream không tải được segment nào thì bỏ hẳn, đừng đưa vào master
-            if ($gotSegments === 0) {
-                Log::warning('HLS: stream có 0 segment', ['video_id' => $video->id, 'quality' => $quality]);
-                continue;
-            }
-
-            $localPlaylist = $this->buildLocalPlaylist($playlist);
-            file_put_contents("{$segmentDir}/index.m3u8", $localPlaylist);
-            $totalDuration = max($totalDuration, (int) $duration);
-            $okStreams[]   = $stream;
-        }
-
-        // Không có stream nào tải được → fail thật, đừng markReady 0 MB
-        if (empty($okStreams)) {
-            Log::error('HLS download failed: không tải được segment nào', [
-                'video_id' => $video->id,
-                'master'   => $masterUrl,
-            ]);
-            return false;
-        }
-
-        file_put_contents("{$outDir}/master.m3u8", $this->buildLocalMaster($okStreams));
-
-        $video->markReady(
-            "{$relBase}/master.m3u8",
-            round($totalSize / 1024 / 1024, 2),
-            $totalDuration
-        );
-
-        Log::info('DownloadService: ready', ['video_id' => $video->id]);
-        return true;
     }
 
     private function getHlsDuration(string $outDir): int
@@ -723,40 +631,6 @@ class DownloadService
             $duration += (float) $d;
         }
         return (int) $duration;
-    }
-
-    private function buildLocalMaster(array $streams): string
-    {
-        $lines = ["#EXTM3U", "#EXT-X-VERSION:3"];
-        foreach ($streams as $s) {
-            $lines[] = "#EXT-X-STREAM-INF:BANDWIDTH={$s['bandwidth']},RESOLUTION={$s['resolution']}";
-            $lines[] = "{$s['quality']}/index.m3u8";
-        }
-        return implode("\n", $lines) . "\n";
-    }
-
-    private function buildLocalPlaylist(string $original): string
-    {
-        $lines  = explode("\n", trim($original));
-        $result = [];
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (str_starts_with($line, '#EXT-X-MAP:')) {
-                // Rewrite init segment URI to local filename
-                $rewritten = preg_replace_callback(
-                    '/#EXT-X-MAP:URI="([^"]+)"/',
-                    fn($m) => '#EXT-X-MAP:URI="' . basename(parse_url($m[1], PHP_URL_PATH)) . '"',
-                    $line
-                );
-                $result[] = $rewritten;
-            } elseif ($line && !str_starts_with($line, '#')) {
-                preg_match('/\/([^\/\?]+\.ts)/', $line, $m);
-                $result[] = $m[1] ?? basename(parse_url($line, PHP_URL_PATH));
-            } else {
-                $result[] = $line;
-            }
-        }
-        return implode("\n", $result) . "\n";
     }
 
     private function highlightSubdir(MatchVideo $video): string

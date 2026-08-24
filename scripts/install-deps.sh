@@ -7,7 +7,7 @@
 # Chạy lại bao nhiêu lần cũng được: mỗi bước tự kiểm tra trước khi làm.
 # Không đụng tới .env, database, hay code.
 #
-# Cài: ffmpeg, rsync, Node 20, Deno, yt-dlp, Chromium (Playwright)
+# Cài: ffmpeg, rsync, Node 20, yt-dlp, Chromium (Playwright)
 # Sửa: cron scheduler dùng sai định dạng, Playwright browser sai chủ sở hữu
 # ─────────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ FAILED=0
 [ -d "$APP_DIR" ]    || { fail "Không thấy $APP_DIR (đặt APP_DIR=... nếu khác)"; exit 1; }
 
 # ── 1. Gói apt ───────────────────────────────────────────────────────
-step "[1/6] ffmpeg + rsync"
+step "[1/5] ffmpeg + rsync"
 missing=()
 for p in ffmpeg rsync; do command -v "$p" >/dev/null || missing+=("$p"); done
 if [ ${#missing[@]} -eq 0 ]; then
@@ -40,7 +40,7 @@ else
 fi
 
 # ── 2. Node 20 ───────────────────────────────────────────────────────
-step "[2/6] Node.js 20"
+step "[2/5] Node.js 20"
 node_major=0
 command -v node >/dev/null && node_major=$(node -v | sed 's/v\([0-9]*\).*/\1/')
 if [ "$node_major" -ge 20 ] 2>/dev/null; then
@@ -50,20 +50,9 @@ else
     apt-get install -y -qq nodejs && ok "cài xong $(node -v)" || fail "cài Node lỗi"
 fi
 
-# ── 3. Deno ──────────────────────────────────────────────────────────
-# scripts/download-highlight.ts — nhánh tải HLS chính (chọn 720p).
-# Thiếu Deno thì rơi về nhánh curl trong PHP: chậm hơn nhưng vẫn chạy.
-step "[3/6] Deno"
-if command -v deno >/dev/null; then
-    ok "đã có $(deno --version | head -1)"
-else
-    curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- -y >/dev/null 2>&1
-    if command -v deno >/dev/null; then ok "cài xong $(deno --version | head -1)"; else fail "cài Deno lỗi"; fi
-fi
-
-# ── 4. yt-dlp ────────────────────────────────────────────────────────
+# ── 3. yt-dlp ────────────────────────────────────────────────────────
 # Bản trong apt luôn lạc hậu vì YouTube đổi API liên tục → lấy binary chính chủ.
-step "[4/6] yt-dlp"
+step "[3/5] yt-dlp"
 if [ -x /usr/local/bin/yt-dlp ]; then
     ok "đã có $(/usr/local/bin/yt-dlp --version 2>/dev/null) — chạy 'yt-dlp -U' để cập nhật"
 else
@@ -72,11 +61,11 @@ else
         && ok "cài xong $(/usr/local/bin/yt-dlp --version 2>/dev/null)" || fail "tải yt-dlp lỗi"
 fi
 
-# ── 5. Playwright Chromium ───────────────────────────────────────────
+# ── 4. Playwright Chromium ───────────────────────────────────────────
 # Mặc định Playwright tải về ~/.cache/ms-playwright. Script này chạy bằng root
 # còn queue worker chạy bằng www-data → www-data không đọc được, và
 # hoofoot-embed.js / dasfootball-embed.js im lặng trả null.
-step "[5/6] Playwright Chromium → $PW_PATH"
+step "[4/5] Playwright Chromium → $PW_PATH"
 mkdir -p "$PW_PATH"
 
 if [ ! -d "$APP_DIR/node_modules/playwright" ]; then
@@ -93,8 +82,8 @@ else
 fi
 chmod -R a+rX "$PW_PATH" 2>/dev/null
 
-# ── 6. Sửa cron + supervisor ─────────────────────────────────────────
-step "[6/6] Cron scheduler + supervisor"
+# ── 5. Sửa cron + supervisor ─────────────────────────────────────────
+step "[5/5] Cron scheduler + supervisor"
 
 # Crontab của user KHÔNG có cột user. Dòng "* * * * * www-data cd ..." khiến
 # cron coi 'www-data' là tên lệnh → scheduler chưa bao giờ chạy.
@@ -151,7 +140,6 @@ else
 fi
 
 check "node"    node -v
-check "deno"    deno --version
 check "yt-dlp"  /usr/local/bin/yt-dlp --version
 
 if sudo -u "$APP_USER" test -r "$(compgen -G "$PW_PATH/chromium-*/chrome-linux/chrome" | head -1)" 2>/dev/null; then
