@@ -4,11 +4,17 @@ namespace App\Console\Commands;
 
 use App\Models\FootballMatch;
 use App\Models\MatchVideo;
+use App\Services\DownloadService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class CleanupMatchesCommand extends Command
 {
+    public function __construct(private DownloadService $downloader)
+    {
+        parent::__construct();
+    }
+
     protected $signature = 'matches:cleanup
                             {--days=14 : Delete matches older than this many days with no ready video}
                             {--prune-dasfootball : Remove DasFootball records on matches that already have a ready Hoofoot video}
@@ -99,19 +105,29 @@ class CleanupMatchesCommand extends Command
         }
     }
 
+    // Video được ghi trên CX23 rồi mới rsync sang SX65, và syncToStorage() xoá bản
+    // local sau khi rsync thành công. Nên phải dọn cả hai nơi: local còn sót khi
+    // rsync hỏng, còn SX65 giữ bản chính.
     private function deleteFiles(FootballMatch $match): int
     {
         $count = 0;
+        $slug  = $match->slug;
 
-        // HLS video directory: storage/app/public/videos/{match_id}/
-        $videoDir = "public/videos/{$match->id}";
-        if (Storage::exists($videoDir)) {
-            Storage::deleteDirectory($videoDir);
-            $count++;
+        foreach (["highlights/{$slug}", "full-matches/{$slug}"] as $relDir) {
+            $localDir = storage_path("app/public/{$relDir}");
+            if (is_dir($localDir)) {
+                File::deleteDirectory($localDir);
+                $this->line("      local: {$relDir}");
+                $count++;
+            }
+
+            if ($this->downloader->deleteFromStorage($relDir)) {
+                $this->line("      sx65 : {$relDir}");
+                $count++;
+            }
         }
 
-        // Thumbnail: storage/public/thumbnails/{slug}.jpg
-        $thumbPath = public_path("storage/thumbnails/{$match->slug}.jpg");
+        $thumbPath = storage_path("app/public/thumbnails/{$slug}.jpg");
         if (file_exists($thumbPath)) {
             unlink($thumbPath);
             $count++;

@@ -494,6 +494,113 @@ class DownloadService
         Log::info('syncToStorage done', ['video_id' => $video->id, 'path' => $relDir]);
     }
 
+    // Xoá một thư mục trên SX65. Video nằm trên CX23 rồi mới rsync sang, nên khi
+    // dọn phải xoá cả hai nơi — bản local có thể còn nếu rsync trước đó thất bại.
+    public function deleteFromStorage(string $relDir): bool
+    {
+        $ssh  = config('services.cdn.sx65_ssh');
+        $base = config('services.cdn.sx65_path');
+        if (!$ssh || !$base) return false;
+
+        // Lệnh này chạy rm -rf trên storage thật → chỉ nhận đúng dạng đã biết:
+        // highlights/{slug}[/{subdir}] hoặc full-matches/{slug}[/{subdir}].
+        // Whitelist chặt hơn blacklist: khoảng trắng, '..', ký tự lạ đều bị loại.
+        $relDir = trim($relDir, " \t\n\r\0\x0B/");
+
+        if (!preg_match('#^(highlights|full-matches)/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$#', $relDir)
+            || str_contains($relDir, '..')
+        ) {
+            Log::error('deleteFromStorage: relDir không hợp lệ', ['relDir' => $relDir]);
+            return false;
+        }
+
+        $cmd = sprintf(
+            'ssh -o BatchMode=yes -o ConnectTimeout=10 %s %s 2>&1',
+            escapeshellarg($ssh),
+            escapeshellarg('rm -rf ' . escapeshellarg("{$base}/{$relDir}"))
+        );
+
+        $out  = [];
+        $code = 0;
+        exec($cmd, $out, $code);
+
+        if ($code !== 0) {
+            Log::error('deleteFromStorage lỗi', [
+                'relDir' => $relDir,
+                'output' => implode("\n", $out),
+            ]);
+            return false;
+        }
+
+        Log::info('deleteFromStorage done', ['relDir' => $relDir]);
+        return true;
+    }
+
+    // Kiểm tra hàng loạt local_path trên SX65 trong MỘT lần ssh.
+    // Trả về [path => 'ok'|'missing'|'empty'].
+    public function checkOnStorage(array $relPaths): array
+    {
+        $ssh  = config('services.cdn.sx65_ssh');
+        $base = config('services.cdn.sx65_path');
+        if (!$ssh || !$base || empty($relPaths)) return [];
+
+        // Remote đọc path từ stdin: thiếu master.m3u8 → missing;
+        // có master nhưng thư mục không còn segment nào → empty.
+        $remote = 'cd ' . escapeshellarg($base) . ' || exit 1; '
+            . 'while IFS= read -r p; do '
+            . '  if [ ! -s "$p" ]; then echo "missing|$p"; continue; fi; '
+            . '  d=$(dirname "$p"); '
+            . '  n=$(find "$d" -name "*.ts" -o -name "*.m4s" 2>/dev/null | head -1); '
+            . '  if [ -z "$n" ]; then echo "empty|$p"; else echo "ok|$p"; fi; '
+            . 'done';
+
+        $cmd = sprintf(
+            'printf %%s %s | ssh -o BatchMode=yes -o ConnectTimeout=15 %s %s 2>/dev/null',
+            escapeshellarg(implode("\n", $relPaths) . "\n"),
+            escapeshellarg($ssh),
+            escapeshellarg($remote)
+        );
+
+        $out  = [];
+        $code = 0;
+        exec($cmd, $out, $code);
+        if ($code !== 0) {
+            Log::error('checkOnStorage: ssh lỗi', ['exit' => $code]);
+            return [];
+        }
+
+        $result = [];
+        foreach ($out as $line) {
+            [$state, $path] = array_pad(explode('|', $line, 2), 2, null);
+            if ($path !== null) $result[$path] = $state;
+        }
+
+        return $result;
+    }
+
+    // Liệt kê thư mục rendition trên SX65 (highlights/{slug}/{subdir}) để tìm rác
+    // không còn row nào trong DB trỏ tới.
+    public function listStorageDirs(): array
+    {
+        $ssh  = config('services.cdn.sx65_ssh');
+        $base = config('services.cdn.sx65_path');
+        if (!$ssh || !$base) return [];
+
+        $remote = 'cd ' . escapeshellarg($base) . ' || exit 1; '
+            . 'find highlights full-matches -mindepth 1 -maxdepth 2 -type d 2>/dev/null';
+
+        $cmd = sprintf(
+            'ssh -o BatchMode=yes -o ConnectTimeout=15 %s %s 2>/dev/null',
+            escapeshellarg($ssh),
+            escapeshellarg($remote)
+        );
+
+        $out = [];
+        exec($cmd, $out);
+
+        return array_values(array_filter(array_map('trim', $out)));
+    }
+
     // ─── Download tất cả pending videos (mọi source) ─────────────
     public function downloadAllPending(): int
     {
