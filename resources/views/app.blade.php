@@ -16,6 +16,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/webp" sizes="512x512" href="/images/favicon-512.webp">
 
     <title data-blade-seo>{{ $title }}</title>
     <meta data-blade-seo name="description" content="{{ $desc }}">

@@ -14,8 +14,7 @@
                     </button>
                 </div>
                 <Link :href="localePath('/')" class="logo">
-                    <span class="logo-dot"></span>
-                    <span class="logo-text">BolaReel</span>
+                    <img src="/images/logo.webp" alt="BolaReel" class="logo-img" />
                 </Link>
                 <div class="topbar-right">
                     <div class="search-wrap">
@@ -140,8 +139,7 @@
                     <!-- Brand -->
                     <div class="footer-brand">
                         <Link :href="localePath('/')" class="footer-logo">
-                            <span class="logo-dot"></span>
-                            <span class="logo-text">BolaReel</span>
+                            <img src="/images/logo.webp" alt="BolaReel" class="logo-img" />
                         </Link>
                         <p class="footer-tagline">{{ t('footer.tagline') }}</p>
                     </div>
@@ -341,9 +339,8 @@ a { text-decoration: none; color: inherit; }
 @media (max-width: 768px) { .topbar-inner { padding: 0 16px; } }
 .topbar-left { display: flex; align-items: center; gap: 8px; flex: 1; }
 .topbar-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex: 1; }
-.logo { display: flex; align-items: center; gap: 8px; position: absolute; left: 50%; transform: translateX(-50%); }
-.logo-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: block; }
-.logo-text { font-size: 20px; font-weight: 700; color: #fff; }
+.logo { display: flex; align-items: center; position: absolute; left: 50%; transform: translateX(-50%); }
+.logo-img { height: 32px; width: auto; display: block; }
 
 .action-btn { width: 38px; height: 38px; border-radius: 50%; background: none; border: none; color: #ef4444; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
 .action-btn:hover { background: #2a2a2a; }
@@ -464,11 +461,10 @@ a { text-decoration: none; color: inherit; }
 .footer-brand { display: flex; flex-direction: column; gap: 14px; }
 
 .footer-logo {
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center;
     text-decoration: none;
 }
-.footer-logo .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: #e01552; flex-shrink: 0; }
-.footer-logo .logo-text { font-size: 18px; font-weight: 700; color: #fff; }
+.footer-logo .logo-img { height: 28px; width: auto; display: block; }
 
 .footer-tagline {
     font-size: 13px; color: #666; line-height: 1.5;

@@ -149,11 +149,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 <div class="login-wrap" id="loginWrap">
     <div class="login-card">
         <div class="login-logo">
-            <div class="login-dot"></div>
-            <div>
-                <div class="login-title">BolaReel Admin</div>
-                <div class="login-sub">Video Management Panel</div>
-            </div>
+            <img src="/images/logo.webp" alt="BolaReel" style="height:28px;width:auto;display:block;margin-bottom:6px;">
+            <div class="login-sub">Admin Panel</div>
         </div>
         <label class="login-label">Admin Key</label>
         <input type="password" id="keyInput" class="login-input" placeholder="Enter admin key..." />
@@ -165,8 +162,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 <div id="app">
     <div class="topbar">
         <div class="topbar-logo">
-            <div class="topbar-dot"></div>
-            <span class="topbar-title">BolaReel</span>
+            <img src="/images/logo.webp" alt="BolaReel" style="height:24px;width:auto;display:block;">
             <span class="topbar-label">Admin</span>
         </div>
         <button class="logout-btn" onclick="logout()">Sign out</button>
