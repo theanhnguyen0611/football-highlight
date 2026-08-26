@@ -280,15 +280,22 @@ class HomeController extends Controller
             'argentina', 'france', 'spain', 'germany', 'england', 'brazil', 'portugal',
         ];
 
-        return FootballMatch::with(['homeTeam.translations', 'awayTeam.translations', 'league', 'videos'])
-            ->where('match_date', '>=', now()->subDays(7))
-            ->whereHas('videos', fn($v) => $v->where('status', 'ready'))
+        $topTeamQuery = fn() => FootballMatch::whereHas('videos', fn($v) => $v->where('status', 'ready'))
             ->where(function ($q) use ($teamSlugs) {
                 $q->whereHas('homeTeam', fn($t) => $t->whereIn('slug', $teamSlugs))
                   ->orWhereHas('awayTeam', fn($t) => $t->whereIn('slug', $teamSlugs));
-            })
+            });
+
+        // Không cố định số lượng — lấy hết trận đội top trong ngày gần nhất có trận
+        $latestDate = $topTeamQuery()->max('match_date');
+        if (!$latestDate) {
+            return [];
+        }
+
+        return $topTeamQuery()
+            ->with(['homeTeam.translations', 'awayTeam.translations', 'league', 'videos'])
+            ->whereDate('match_date', $latestDate)
             ->orderBy('match_date', 'desc')
-            ->limit(20)
             ->get()
             ->map(fn($m) => $this->serializeRelated($m))
             ->toArray();
