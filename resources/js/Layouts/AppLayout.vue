@@ -17,7 +17,7 @@
                     <img src="/images/logo.webp" alt="BolaReel" class="logo-img" />
                 </Link>
                 <div class="topbar-right">
-                    <div class="search-wrap">
+                    <div class="search-wrap" @click.stop>
                         <div class="search-box" :class="{ focused: searchFocused }">
                             <input v-model="searchQuery" type="text" :placeholder="t('nav.search')" class="search-input"
                                 @focus="searchFocused = true; showSuggestions = true"
