@@ -657,6 +657,16 @@ onUnmounted(() => {
     margin-right: auto !important;
     padding-left: 4px;
 }
+
+/* Poster thường lộ tỉ số (graphic của đài) — làm mờ tới khi tự bấm "Hiện
+   tỉ số" hoặc bắt đầu play (lúc đó video thật thay chỗ poster, hết cần mờ).
+   .plyr__poster do Plyr tự tạo bằng JS, không có data-v- của Vue nên rule
+   này BẮT BUỘC phải nằm ở style global (không phải scoped) mới khớp được. */
+.poster-blur .plyr__poster,
+.poster-blur video {
+    filter: blur(24px);
+    transform: scale(1.1);
+}
 </style>
 
 <style scoped>
@@ -690,15 +700,6 @@ a { text-decoration: none; color: inherit; }
     margin-bottom: 12px;
 }
 .plyr-container { width: 100%; height: 100%; }
-
-/* Poster thường lộ tỉ số (graphic của đài) — làm mờ tới khi tự bấm "Hiện
-   tỉ số" hoặc bắt đầu play (lúc đó video thật thay chỗ poster, hết cần mờ).
-   Plyr không dùng poster gốc của <video>, nó tự vẽ .plyr__poster đè lên. */
-.poster-blur .plyr__poster,
-.poster-blur video {
-    filter: blur(24px);
-    transform: scale(1.1);
-}
 
 /* ── Click area + flash ── */
 .player-click-area {
