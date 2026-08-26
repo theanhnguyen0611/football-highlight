@@ -30,12 +30,20 @@
     <meta data-blade-seo property="og:site_name" content="BolaReel">
     <meta data-blade-seo property="og:type" content="{{ $ogType }}">
     <meta data-blade-seo property="og:locale" content="{{ $ogLocale }}">
+    @foreach(array_diff(['en_US','es_ES','pt_BR','ar_AR','id_ID','ja_JP','fr_FR','de_DE','tr_TR','hi_IN'], [$ogLocale]) as $altLocale)
+    <meta data-blade-seo property="og:locale:alternate" content="{{ $altLocale }}">
+    @endforeach
     <meta data-blade-seo property="og:title" content="{{ $title }}">
     <meta data-blade-seo property="og:description" content="{{ $desc }}">
     @if($canon)<meta data-blade-seo property="og:url" content="{{ $canon }}">@endif
     @if($image)
     <meta data-blade-seo property="og:image" content="{{ $image }}">
     <meta data-blade-seo property="og:image:alt" content="{{ $title }}">
+    @if(str_ends_with($image, 'favicon-512.webp'))
+    <meta data-blade-seo property="og:image:width" content="512">
+    <meta data-blade-seo property="og:image:height" content="512">
+    <meta data-blade-seo property="og:image:type" content="image/webp">
+    @endif
     @endif
 
     {{-- Twitter --}}

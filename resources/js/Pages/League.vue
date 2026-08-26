@@ -5,6 +5,7 @@
         <link rel="canonical" :href="seo.canonical" />
         <meta property="og:site_name" content="BolaReel" />
         <meta property="og:locale" :content="seo.ogLocale" />
+        <meta v-for="l in seo.ogLocaleAlternates" :key="l" property="og:locale:alternate" :content="l" />
         <meta property="og:title" :content="seo.fullTitle" />
         <meta property="og:description" :content="seo.description" />
         <meta property="og:url" :content="seo.canonical" />
@@ -225,6 +226,7 @@ a { text-decoration: none; color: inherit; }
     width: 100%;
 }
 @media (max-width: 768px) { .hero-content { padding: 0 16px 20px; gap: 14px; } }
+@media (max-width: 380px) { .hero-content { gap: 10px; padding: 0 12px 16px; } }
 
 .hero-logo {
     width: 72px; height: 72px;
@@ -238,18 +240,20 @@ a { text-decoration: none; color: inherit; }
 .hero-logo img { width: 50px; height: 50px; object-fit: contain; }
 .hero-logo span { font-size: 22px; font-weight: 700; color: #1a1a1a; }
 @media (max-width: 768px) { .hero-logo { width: 56px; height: 56px; } .hero-logo img { width: 38px; height: 38px; } }
+@media (max-width: 380px) { .hero-logo { width: 46px; height: 46px; } .hero-logo img { width: 32px; height: 32px; } }
 
 .hero-label { margin: 0 0 2px; font-size: 10px; font-weight: 700; color: #ef4444; text-transform: uppercase; letter-spacing: 0.08em; }
 .hero-title { margin: 0 0 4px; font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -0.02em; line-height: 1.1; }
 .hero-sub { margin: 0; font-size: 12px; color: #b8b8c4; }
 @media (max-width: 768px) { .hero-title { font-size: 20px; } }
+@media (max-width: 380px) { .hero-title { font-size: 17px; } }
 
 /* ── Section header ── */
 .section-head { display: flex; align-items: flex-start; margin: 0 28px 16px; }
 .section-head-left { display: flex; align-items: flex-start; gap: 10px; }
 .section-icon { color: #ff4d6d; flex-shrink: 0; margin-top: 2px; display: flex; }
 .section-title { margin: 0; font-size: 15px; font-weight: 700; color: #f5f5f7; letter-spacing: -0.02em; line-height: 1.3; }
-.section-sub { margin: 3px 0 0; font-size: 11.5px; color: #b8b8c4; line-height: 1; }
+.section-sub { margin: 3px 0 0; font-size: 11.5px; color: #cfcfd8; line-height: 1; }
 @media (max-width: 768px) { .section-head { margin: 0 16px 14px; } }
 
 /* ── Empty ── */
@@ -354,7 +358,7 @@ a { text-decoration: none; color: inherit; }
 .card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .card-badges { display: flex; align-items: center; gap: 5px; overflow: hidden; flex: 1; min-width: 0; }
 .badge-hot {
-    font-size: 9.5px; font-weight: 700;
+    font-size: 10.5px; font-weight: 700;
     color: #fff;
     background: linear-gradient(135deg, #ff8a00, #e01552);
     padding: 3px 7px; border-radius: 4px;

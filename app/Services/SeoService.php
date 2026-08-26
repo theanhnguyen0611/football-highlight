@@ -157,6 +157,11 @@ class SeoService
         'ja' => 'ページ', 'fr' => 'Page', 'de' => 'Seite', 'tr' => 'Sayfa', 'hi' => 'पेज',
     ];
 
+    private const HOME_LABEL = [
+        'en' => 'Home', 'es' => 'Inicio', 'pt' => 'Início', 'ar' => 'الرئيسية', 'id' => 'Beranda',
+        'ja' => 'ホーム', 'fr' => 'Accueil', 'de' => 'Startseite', 'tr' => 'Ana Sayfa', 'hi' => 'होम',
+    ];
+
     private const SITE_DESCS = [
         'en' => 'Watch the latest football highlights, goals and full match replays. Premier League, Champions League, La Liga, Serie A, Bundesliga – all free on BolaReel.',
         'es' => 'Mira los últimos highlights, goles y repeticiones de fútbol. Premier League, Champions League, La Liga, Serie A, Bundesliga – todo gratis en BolaReel.',
@@ -191,7 +196,7 @@ class SeoService
             'title'       => $title,
             'description' => $desc,
             'canonical'   => $this->localUrl($this->locale, $path),
-            'image'       => null,
+            'image'       => $this->appUrl . '/images/favicon-512.webp',
             'noindex'     => false,
             'alternates'  => $this->buildAlternates($path),
             'jsonLd'      => [
@@ -271,7 +276,14 @@ class SeoService
             'ogType'      => 'video.other',
             'noindex'     => false,
             'alternates'  => $this->buildAlternates($path),
-            'jsonLd'      => $this->matchJsonLd($match, $base, $desc, $thumbnail, $date),
+            'jsonLd'      => [
+                $this->matchJsonLd($match, $base, $desc, $thumbnail, $date),
+                $this->breadcrumbLd(array_filter([
+                    ['name' => self::HOME_LABEL[$this->locale] ?? self::HOME_LABEL['en'], 'url' => $this->appUrl . '/'],
+                    $league ? ['name' => $league, 'url' => $this->appUrl . "/league/{$match->league?->slug}"] : null,
+                    ['name' => $base, 'url' => $this->localUrl($this->locale, $path)],
+                ])),
+            ],
         ];
     }
 
@@ -291,12 +303,18 @@ class SeoService
             'noindex'     => false,
             'alternates'  => $this->buildAlternates($path),
             'jsonLd'      => [
-                '@context'    => 'https://schema.org',
-                '@type'       => 'SportsOrganization',
-                'name'        => $league->name,
-                'url'         => $this->localUrl($this->locale, $path),
-                'logo'        => $league->logo_url,
-                'description' => $this->leagueDesc($league->name, $season),
+                [
+                    '@context'    => 'https://schema.org',
+                    '@type'       => 'SportsOrganization',
+                    'name'        => $league->name,
+                    'url'         => $this->localUrl($this->locale, $path),
+                    'logo'        => $league->logo_url,
+                    'description' => $this->leagueDesc($league->name, $season),
+                ],
+                $this->breadcrumbLd([
+                    ['name' => self::HOME_LABEL[$this->locale] ?? self::HOME_LABEL['en'], 'url' => $this->appUrl . '/'],
+                    ['name' => $league->name, 'url' => $this->localUrl($this->locale, $path)],
+                ]),
             ],
         ];
     }
@@ -317,12 +335,18 @@ class SeoService
             'noindex'     => false,
             'alternates'  => $this->buildAlternates($path),
             'jsonLd'      => [
-                '@context'    => 'https://schema.org',
-                '@type'       => 'SportsTeam',
-                'name'        => $team->name,
-                'url'         => $this->localUrl($this->locale, $path),
-                'logo'        => $team->logo_url,
-                'description' => $this->teamDesc($team->name, $season),
+                [
+                    '@context'    => 'https://schema.org',
+                    '@type'       => 'SportsTeam',
+                    'name'        => $team->name,
+                    'url'         => $this->localUrl($this->locale, $path),
+                    'logo'        => $team->logo_url,
+                    'description' => $this->teamDesc($team->name, $season),
+                ],
+                $this->breadcrumbLd([
+                    ['name' => self::HOME_LABEL[$this->locale] ?? self::HOME_LABEL['en'], 'url' => $this->appUrl . '/'],
+                    ['name' => $team->name, 'url' => $this->localUrl($this->locale, $path)],
+                ]),
             ],
         ];
     }
@@ -382,8 +406,30 @@ class SeoService
         if ($video?->source_url && !str_contains($video->source_url, 'videas')) {
             $ld['contentUrl'] = $video->source_url;
         }
+        if ($video?->duration_seconds) {
+            $ld['duration'] = 'PT' . (int) $video->duration_seconds . 'S';
+        }
+
+        $ld['isFamilyFriendly'] = true;
+        $ld['inLanguage']       = self::HTML_LANG[$this->locale] ?? 'en';
 
         return $ld;
+    }
+
+    private function breadcrumbLd(array $items): array
+    {
+        $items = array_values($items);
+
+        return [
+            '@context'        => 'https://schema.org',
+            '@type'           => 'BreadcrumbList',
+            'itemListElement' => array_map(fn ($it, $i) => [
+                '@type'    => 'ListItem',
+                'position' => $i + 1,
+                'name'     => $it['name'],
+                'item'     => $it['url'],
+            ], $items, array_keys($items)),
+        ];
     }
 
     private function buildAlternates(string $path): array

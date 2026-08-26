@@ -212,7 +212,7 @@ function formatDate(date) {
     border-radius: 3px;
     letter-spacing: 0.3px;
 }
-.thumb-date { font-size: 10px; color: #4b5563; }
+.thumb-date { font-size: 10px; color: #9ca3af; }
 
 /* ── Play button ── */
 .play-wrap {
@@ -264,4 +264,17 @@ function formatDate(date) {
     padding: 0 6px;
 }
 .score.muted { color: #374151; }
+
+@media (max-width: 480px) {
+    .logo-wrap { width: 56px; height: 56px; }
+    .logo-img { width: 36px; height: 36px; }
+    .logo-text { font-size: 11px; }
+    .init-l, .init-r { font-size: 56px; }
+    .play-btn { width: 32px; height: 32px; font-size: 13px; }
+    .thumb-vs { font-size: 9px; padding: 2px 5px; }
+    .thumb-league, .thumb-date { font-size: 9px; }
+    .team-name { font-size: 12px; }
+    .score { font-size: 13px; }
+    .card-body { padding: 8px 10px; }
+}
 </style>

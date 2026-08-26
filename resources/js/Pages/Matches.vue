@@ -5,6 +5,7 @@
         <link rel="canonical" :href="seo.canonical" />
         <meta property="og:site_name" content="BolaReel" />
         <meta property="og:locale" :content="seo.ogLocale" />
+        <meta v-for="l in seo.ogLocaleAlternates" :key="l" property="og:locale:alternate" :content="l" />
         <meta property="og:title" :content="seo.fullTitle" />
         <meta property="og:description" :content="seo.description" />
         <meta property="og:url" :content="seo.canonical" />
@@ -172,7 +173,7 @@ a { text-decoration: none; color: inherit; }
 .section-head-left { display: flex; align-items: flex-start; gap: 10px; }
 .section-icon { color: #ff4d6d; flex-shrink: 0; margin-top: 2px; display: flex; }
 .section-title { margin: 0; font-size: 15px; font-weight: 700; color: #f5f5f7; letter-spacing: -0.02em; line-height: 1.3; }
-.section-sub { margin: 3px 0 0; font-size: 11.5px; color: #b8b8c4; line-height: 1; }
+.section-sub { margin: 3px 0 0; font-size: 11.5px; color: #cfcfd8; line-height: 1; }
 
 /* ── Grid ── */
 .video-grid {
@@ -311,7 +312,7 @@ a { text-decoration: none; color: inherit; }
 .card-badges { display: flex; align-items: center; gap: 5px; overflow: hidden; flex: 1; min-width: 0; }
 
 .badge-hot {
-    font-size: 9.5px; font-weight: 700;
+    font-size: 10.5px; font-weight: 700;
     color: #fff;
     background: linear-gradient(135deg, #ff8a00, #e01552);
     padding: 3px 7px; border-radius: 4px;
@@ -319,7 +320,7 @@ a { text-decoration: none; color: inherit; }
     white-space: nowrap; flex-shrink: 0;
 }
 .badge-league {
-    font-size: 9.5px; font-weight: 700;
+    font-size: 10.5px; font-weight: 700;
     color: #ff4d6d;
     background: rgba(224,21,82,0.1);
     border: 0.5px solid rgba(255,77,109,0.25);

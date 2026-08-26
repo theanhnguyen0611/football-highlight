@@ -232,7 +232,7 @@ onUnmounted(() => {
     align-items: center;
     justify-content: center;
     gap: 12px;
-    color: #555;
+    color: #999;
     font-size: 13px;
 }
 
@@ -361,7 +361,7 @@ onUnmounted(() => {
     border-radius: 4px;
     border: 1px solid rgba(255,255,255,.12);
     background: transparent;
-    color: #888;
+    color: #aaa;
     font-size: 11px;
     cursor: pointer;
     transition: all .15s;

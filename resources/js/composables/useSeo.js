@@ -15,6 +15,23 @@ const OG_LOCALE = {
     ja: 'ja_JP', fr: 'fr_FR', de: 'de_DE', tr: 'tr_TR', hi: 'hi_IN',
 }
 
+function ogLocaleAlternates(current) {
+    return Object.values(OG_LOCALE).filter(l => l !== current)
+}
+
+function breadcrumbLd(items) {
+    return {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: items.map((it, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: it.name,
+            item: it.url,
+        })),
+    }
+}
+
 const DATE_LOCALE = {
     en: 'en-GB', es: 'es-ES', pt: 'pt-BR', ar: 'ar-SA', id: 'id-ID',
     ja: 'ja-JP', fr: 'fr-FR', de: 'de-DE', tr: 'tr-TR', hi: 'hi-IN',
@@ -103,6 +120,11 @@ const PAGE_LABEL = {
     ja: 'ページ', fr: 'Page', de: 'Seite', tr: 'Sayfa', hi: 'पेज',
 }
 
+const HOME_LABEL = {
+    en: 'Home', es: 'Inicio', pt: 'Início', ar: 'الرئيسية', id: 'Beranda',
+    ja: 'ホーム', fr: 'Accueil', de: 'Startseite', tr: 'Ana Sayfa', hi: 'होम',
+}
+
 const SITE_DESCS = {
     en: 'Watch the latest football highlights, goals and full match replays. Premier League, Champions League, La Liga, Serie A, Bundesliga – all free on BolaReel.',
     es: 'Mira los últimos highlights, goles y repeticiones de fútbol. Premier League, Champions League, La Liga, Serie A, Bundesliga – todo gratis en BolaReel.',
@@ -182,7 +204,9 @@ export function useSeo(locale = 'en') {
             fullTitle: `${title} | ${SITE_NAME}`,
             description,
             canonical,
+            image: getOrigin() + '/images/favicon-512.webp',
             ogLocale: OG_LOCALE[loc.value] || 'en_US',
+            ogLocaleAlternates: ogLocaleAlternates(OG_LOCALE[loc.value] || 'en_US'),
             alternates: buildAlternates(path),
             jsonLd: {
                 '@context': 'https://schema.org',
@@ -213,6 +237,7 @@ export function useSeo(locale = 'en') {
             description,
             canonical,
             ogLocale: OG_LOCALE[loc.value] || 'en_US',
+            ogLocaleAlternates: ogLocaleAlternates(OG_LOCALE[loc.value] || 'en_US'),
             alternates: buildAlternates(path),
         }
     }
@@ -324,6 +349,16 @@ export function useSeo(locale = 'en') {
         if (image) jsonLd.thumbnailUrl = image
         if (video?.embed_url) jsonLd.embedUrl = video.embed_url
         else if (video?.source_url) jsonLd.contentUrl = video.source_url
+        if (video?.duration_seconds) jsonLd.duration = `PT${Math.round(video.duration_seconds)}S`
+        jsonLd.isFamilyFriendly = true
+        jsonLd.inLanguage = HTML_LANG[loc.value] || 'en'
+
+        const homeLabel = HOME_LABEL[loc.value] || HOME_LABEL.en
+        const breadcrumb = breadcrumbLd([
+            { name: homeLabel, url: getOrigin() + '/' },
+            ...(league ? [{ name: league, url: getOrigin() + `/league/${match.league?.slug}` }] : []),
+            { name: title, url: canonical },
+        ])
 
         return {
             title,
@@ -333,8 +368,9 @@ export function useSeo(locale = 'en') {
             image,
             ogType: 'video.other',
             ogLocale: OG_LOCALE[loc.value] || 'en_US',
+            ogLocaleAlternates: ogLocaleAlternates(OG_LOCALE[loc.value] || 'en_US'),
             alternates: buildAlternates(path),
-            jsonLd,
+            jsonLd: [jsonLd, breadcrumb],
         }
     }
 
@@ -367,15 +403,22 @@ export function useSeo(locale = 'en') {
             canonical,
             image: league.logo_url || null,
             ogLocale: OG_LOCALE[loc.value] || 'en_US',
+            ogLocaleAlternates: ogLocaleAlternates(OG_LOCALE[loc.value] || 'en_US'),
             alternates: buildAlternates(path),
-            jsonLd: {
-                '@context': 'https://schema.org',
-                '@type': 'SportsOrganization',
-                name,
-                url: canonical,
-                logo: league.logo_url || undefined,
-                description,
-            },
+            jsonLd: [
+                {
+                    '@context': 'https://schema.org',
+                    '@type': 'SportsOrganization',
+                    name,
+                    url: canonical,
+                    logo: league.logo_url || undefined,
+                    description,
+                },
+                breadcrumbLd([
+                    { name: HOME_LABEL[loc.value] || HOME_LABEL.en, url: getOrigin() + '/' },
+                    { name, url: canonical },
+                ]),
+            ],
         }
     }
 
@@ -408,15 +451,22 @@ export function useSeo(locale = 'en') {
             canonical,
             image: team.logo_url || null,
             ogLocale: OG_LOCALE[loc.value] || 'en_US',
+            ogLocaleAlternates: ogLocaleAlternates(OG_LOCALE[loc.value] || 'en_US'),
             alternates: buildAlternates(path),
-            jsonLd: {
-                '@context': 'https://schema.org',
-                '@type': 'SportsTeam',
-                name,
-                url: canonical,
-                logo: team.logo_url || undefined,
-                description,
-            },
+            jsonLd: [
+                {
+                    '@context': 'https://schema.org',
+                    '@type': 'SportsTeam',
+                    name,
+                    url: canonical,
+                    logo: team.logo_url || undefined,
+                    description,
+                },
+                breadcrumbLd([
+                    { name: HOME_LABEL[loc.value] || HOME_LABEL.en, url: getOrigin() + '/' },
+                    { name, url: canonical },
+                ]),
+            ],
         }
     }
 
@@ -436,6 +486,7 @@ export function useSeo(locale = 'en') {
             canonical,
             noindex: !q,
             ogLocale: OG_LOCALE[loc.value] || 'en_US',
+            ogLocaleAlternates: ogLocaleAlternates(OG_LOCALE[loc.value] || 'en_US'),
             alternates: buildAlternates(path),
         }
     }

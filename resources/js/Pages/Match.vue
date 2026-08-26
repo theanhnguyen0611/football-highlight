@@ -5,6 +5,7 @@
         <link rel="canonical" :href="seo.canonical" />
         <meta property="og:site_name" content="BolaReel" />
         <meta property="og:locale" :content="seo.ogLocale" />
+        <meta v-for="l in seo.ogLocaleAlternates" :key="l" property="og:locale:alternate" :content="l" />
         <meta property="og:title" :content="seo.fullTitle" />
         <meta property="og:description" :content="seo.description" />
         <meta property="og:url" :content="seo.canonical" />

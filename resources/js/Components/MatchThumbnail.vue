@@ -164,4 +164,15 @@ const bgStyle = computed(() => {
 .match-thumb.compact .thumb-name { font-size: 11px; max-width: 90px; }
 .match-thumb.compact .thumb-vs { font-size: 16px; }
 .match-thumb.compact .thumb-teams { gap: 18px; }
+
+@media (max-width: 480px) {
+    .thumb-teams { gap: 14px; padding: 0 6%; }
+    .thumb-logo { width: 44px; height: 44px; }
+    .thumb-initials { font-size: 11px; }
+    .thumb-name { font-size: 11px; max-width: 90px; }
+    .thumb-vs { font-size: 15px; }
+    .match-thumb.compact .thumb-teams { gap: 10px; }
+    .match-thumb.compact .thumb-logo { width: 36px; height: 36px; }
+    .match-thumb.compact .thumb-name { max-width: 68px; }
+}
 </style>
