@@ -46,7 +46,7 @@
                             <p class="ph-label">{{ t('match.no_video') }}</p>
                         </div>
 
-                        <div v-show="hasVideo" class="plyr-container" :class="{ 'poster-blur': !scoreVisible && !isPlaying }">
+                        <div v-show="hasVideo" class="plyr-container" :class="{ 'poster-blur': !scoreVisible && !hasStarted }">
                             <video ref="videoEl" playsinline :poster="match.thumbnail_url || undefined"></video>
                         </div>
 
@@ -334,6 +334,7 @@ injectJsonLd(computed(() => seo.value.jsonLd))
 
 const videoEl        = ref(null)
 const scoreVisible   = ref(false)
+const hasStarted     = ref(false) // true khi đã play lần đầu — pause giữa chừng không mờ lại
 const activeTab      = ref('events')
 const activeVideoIdx = ref(0)
 const isPlaying      = ref(false)
@@ -597,7 +598,7 @@ onMounted(() => {
         youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 },
     })
 
-    plyrInstance.on('play',  () => { isPlaying.value = true })
+    plyrInstance.on('play',  () => { isPlaying.value = true; hasStarted.value = true })
     plyrInstance.on('pause', () => { isPlaying.value = false })
     plyrInstance.on('ended', () => { isPlaying.value = false })
 
@@ -664,8 +665,8 @@ onUnmounted(() => {
    này BẮT BUỘC phải nằm ở style global (không phải scoped) mới khớp được. */
 .poster-blur .plyr__poster,
 .poster-blur video {
-    filter: blur(24px);
-    transform: scale(1.1);
+    filter: blur(14px);
+    transform: scale(1.06);
 }
 </style>
 
