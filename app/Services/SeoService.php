@@ -152,6 +152,11 @@ class SeoService
         'hi' => 'फुटबॉल हाइलाइट्स, गोल और मैच रिप्ले',
     ];
 
+    private const PAGE_LABEL = [
+        'en' => 'Page', 'es' => 'Página', 'pt' => 'Página', 'ar' => 'صفحة', 'id' => 'Halaman',
+        'ja' => 'ページ', 'fr' => 'Page', 'de' => 'Seite', 'tr' => 'Sayfa', 'hi' => 'पेज',
+    ];
+
     private const SITE_DESCS = [
         'en' => 'Watch the latest football highlights, goals and full match replays. Premier League, Champions League, La Liga, Serie A, Bundesliga – all free on BolaReel.',
         'es' => 'Mira los últimos highlights, goles y repeticiones de fútbol. Premier League, Champions League, La Liga, Serie A, Bundesliga – todo gratis en BolaReel.',
@@ -204,6 +209,28 @@ class SeoService
                     'query-input' => 'required name=search_term_string',
                 ],
             ],
+        ];
+    }
+
+    public function matches(int $page = 1): array
+    {
+        $path  = '/matches';
+        $base  = self::HOME_TITLES[$this->locale] ?? self::HOME_TITLES['en'];
+        $label = self::PAGE_LABEL[$this->locale] ?? self::PAGE_LABEL['en'];
+        $title = $page > 1 ? "{$base} – {$label} {$page} | BolaReel" : "{$base} | BolaReel";
+        $desc  = self::SITE_DESCS[$this->locale] ?? self::SITE_DESCS['en'];
+
+        // Canonical tự trỏ theo page (khác pattern home/league) để Google index được cả các trận cũ hơn
+        $canonical = $this->localUrl($this->locale, $path) . ($page > 1 ? "?page={$page}" : '');
+
+        return [
+            'title'       => $title,
+            'description' => $desc,
+            'canonical'   => $canonical,
+            'image'       => null,
+            'noindex'     => false,
+            'alternates'  => $this->buildAlternates($path),
+            'jsonLd'      => null,
         ];
     }
 

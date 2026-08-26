@@ -20,82 +20,7 @@
     >
         <div class="home-wrap">
 
-            <!-- Featured Highlights -->
-            <div v-if="featured_highlights.length" class="featured-section">
-                <div class="section-head">
-                    <div class="section-head-left">
-                        <span class="section-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                            </svg>
-                        </span>
-                        <div>
-                            <h2 class="section-title">{{ t('ui.featured_highlights') }}</h2>
-                            <p class="section-sub">{{ t('ui.featured_sub') }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="featured-grid">
-                    <Link
-                        v-for="match in featured_highlights"
-                        :key="match.id"
-                        :href="localePath(`/match/${match.slug}`)"
-                        class="video-card"
-                    >
-                        <div class="thumb" :style="thumbBg(match)">
-                            <div class="thumb-overlay"></div>
-                            <div class="thumb-fade"></div>
-
-                            <div class="thumb-teams">
-                                <div class="fb-team">
-                                    <div class="fb-logo">
-                                        <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
-                                        <span v-else>{{ match.home_team?.initials }}</span>
-                                    </div>
-                                    <span class="fb-name">{{ teamName(match.home_team) }}</span>
-                                </div>
-
-                                <div class="fb-middle">
-                                    <span class="fb-vs">VS</span>
-                                    <div class="fb-score" :style="{ visibility: showScore ? 'visible' : 'hidden' }">
-                                        {{ match.home_score ?? '?' }} – {{ match.away_score ?? '?' }}
-                                    </div>
-                                </div>
-
-                                <div class="fb-team">
-                                    <div class="fb-logo">
-                                        <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
-                                        <span v-else>{{ match.away_team?.initials }}</span>
-                                    </div>
-                                    <span class="fb-name">{{ teamName(match.away_team) }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card-info">
-                            <div class="card-teams-row">
-                                <span class="ctr-name">{{ teamName(match.home_team) }}</span>
-                                <span class="ctr-vs">{{ t('ui.vs') }}</span>
-                                <span class="ctr-name">{{ teamName(match.away_team) }}</span>
-                            </div>
-                            <div v-if="match.venue" class="card-venue">
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                <span>{{ match.venue }}</span>
-                            </div>
-                            <div class="card-meta">
-                                <div class="card-badges">
-                                    <span class="badge-league">{{ leagueName(match.league) }}</span>
-                                    <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
-                                </div>
-                                <span class="meta-date">{{ formatDate(match.match_date) }}</span>
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-            </div>
-
-            <div class="section-head" style="margin-top:32px;">
+            <div class="section-head">
                 <div class="section-head-left">
                     <span class="section-icon">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -104,8 +29,8 @@
                         </svg>
                     </span>
                     <div>
-                        <h2 class="section-title">{{ t('match.latest') }}</h2>
-                        <p class="section-sub">{{ matches.total ?? matchList.length }} {{ t('ui.matches_available') }}</p>
+                        <h2 class="section-title">{{ t('ui.latest_matches') }}</h2>
+                        <p class="section-sub">{{ matches.total }} {{ t('ui.matches_available') }}</p>
                     </div>
                 </div>
             </div>
@@ -145,7 +70,6 @@
                                 <span class="fb-name">{{ teamName(match.away_team) }}</span>
                             </div>
                         </div>
-
                     </div>
 
                     <div class="card-info">
@@ -188,27 +112,21 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import { computed, toRef, ref } from 'vue'
+import { computed, toRef } from 'vue'
 import { useLocale } from '@/composables/useLocale'
 import { useSeo, injectJsonLd } from '@/composables/useSeo'
 
 const props = defineProps({
-    matches:              Object,
-    leagues:              Array,
-    popular_teams:        { type: Array, default: () => [] },
-    featured_highlights:  { type: Array, default: () => [] },
-    locale:               { type: String, default: 'en' },
+    matches:       Object,
+    leagues:       Array,
+    popular_teams: { type: Array, default: () => [] },
+    locale:        { type: String, default: 'en' },
 })
-
-const featuredRowRef = ref(null)
-function scrollFeatured(dir) {
-    if (featuredRowRef.value) featuredRowRef.value.scrollBy({ left: dir * 800, behavior: 'smooth' })
-}
 
 const { teamName, leagueName, t, formatDate, formatRound, formatPageLabel, localePath } = useLocale(toRef(props, 'locale'))
 const matchList = computed(() => props.matches?.data ?? [])
-const { homeSeo } = useSeo(toRef(props, 'locale'))
-const seo = computed(() => homeSeo())
+const { matchesSeo } = useSeo(toRef(props, 'locale'))
+const seo = computed(() => matchesSeo(props.matches?.current_page ?? 1))
 injectJsonLd(computed(() => seo.value.jsonLd))
 
 function thumbBg(match) {
@@ -222,14 +140,14 @@ function thumbBg(match) {
     return { background: `linear-gradient(135deg, ${c}66 0%, #0b0b10 60%, ${c}33 100%)` }
 }
 
-// Trang 1 "sống" ở đây, từ trang 2 trở đi chuyển sang /matches để có URL riêng, index được cả trận cũ
+// Page 1 "sống" ở trang chủ -> quay lại "/" thay vì tự render lại ở đây
 function goToPage(url) {
     if (!url) return
     const page = new URL(url).searchParams.get('page')
     if (!page || page === '1') {
-        router.visit(url)
+        router.visit(localePath('/'))
     } else {
-        router.visit(`${localePath('/matches')}?page=${page}`)
+        router.visit(url)
     }
 }
 </script>
@@ -253,17 +171,6 @@ a { text-decoration: none; color: inherit; }
 .section-icon { color: #ff4d6d; flex-shrink: 0; margin-top: 2px; display: flex; }
 .section-title { margin: 0; font-size: 15px; font-weight: 700; color: #f5f5f7; letter-spacing: -0.02em; line-height: 1.3; }
 .section-sub { margin: 3px 0 0; font-size: 11.5px; color: #b8b8c4; line-height: 1; }
-
-/* ── Featured section ── */
-.featured-section { margin-bottom: 32px; }
-
-.featured-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-}
-@media (max-width: 1200px) { .featured-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 860px)  { .featured-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
 
 /* ── Grid ── */
 .video-grid {

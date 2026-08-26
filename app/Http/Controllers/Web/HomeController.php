@@ -18,29 +18,7 @@ class HomeController extends Controller
         $featured = $this->getFeaturedHighlights();
         $featuredIds = array_column($featured, 'id');
 
-        $query = FootballMatch::with([
-            'homeTeam.translations',
-            'awayTeam.translations',
-            'league',
-            'videos',
-        ])
-        ->whereHas('videos', fn($v) => $v->where('status', 'ready'))
-        ->when(!empty($featuredIds), fn($q) => $q->whereNotIn('id', $featuredIds))
-        ->orderBy('match_date', 'desc');
-
-        if ($request->filled('q')) {
-            $q = $request->q;
-            $query->where(function ($sq) use ($q) {
-                $sq->whereHas('homeTeam', fn($t) => $t->where('name', 'like', "%{$q}%"))
-                   ->orWhereHas('awayTeam', fn($t) => $t->where('name', 'like', "%{$q}%"));
-            });
-        }
-
-        if ($request->filled('league')) {
-            $query->whereHas('league', fn($l) => $l->where('slug', $request->league));
-        }
-
-        $matches = $query->paginate(20)->withQueryString();
+        $matches = $this->latestHighlightsQuery($featuredIds)->paginate(20)->withQueryString();
 
         view()->share('seo', app(SeoService::class)->home());
 
@@ -49,8 +27,23 @@ class HomeController extends Controller
             'leagues'             => $this->getLeagues(),
             'popular_teams'       => $this->getPopularTeams(),
             'featured_highlights' => $featured,
-            'filters'             => $request->only(['q', 'league']),
             'locale'              => app()->getLocale(),
+        ]);
+    }
+
+    public function matches(Request $request): Response
+    {
+        // Cùng query với Latest Highlights ở trang chủ để số trang khớp nhau xuyên suốt
+        $featuredIds = array_column($this->getFeaturedHighlights(), 'id');
+        $matches = $this->latestHighlightsQuery($featuredIds)->paginate(20)->withQueryString();
+
+        view()->share('seo', app(SeoService::class)->matches($matches->currentPage()));
+
+        return Inertia::render('Matches', [
+            'matches'       => $matches,
+            'leagues'       => $this->getLeagues(),
+            'popular_teams' => $this->getPopularTeams(),
+            'locale'        => app()->getLocale(),
         ]);
     }
 
@@ -269,6 +262,19 @@ class HomeController extends Controller
     }
 
     // ── Private helpers ────────────────────────────────────────
+
+    private function latestHighlightsQuery(array $excludeIds = [])
+    {
+        return FootballMatch::with([
+            'homeTeam.translations',
+            'awayTeam.translations',
+            'league',
+            'videos',
+        ])
+        ->whereHas('videos', fn($v) => $v->where('status', 'ready'))
+        ->when(!empty($excludeIds), fn($q) => $q->whereNotIn('id', $excludeIds))
+        ->orderBy('match_date', 'desc');
+    }
 
     private function getFeaturedHighlights(): array
     {

@@ -98,6 +98,11 @@ const HOME_TITLES = {
     hi: 'फुटबॉल हाइलाइट्स, गोल और मैच रिप्ले',
 }
 
+const PAGE_LABEL = {
+    en: 'Page', es: 'Página', pt: 'Página', ar: 'صفحة', id: 'Halaman',
+    ja: 'ページ', fr: 'Page', de: 'Seite', tr: 'Sayfa', hi: 'पेज',
+}
+
 const SITE_DESCS = {
     en: 'Watch the latest football highlights, goals and full match replays. Premier League, Champions League, La Liga, Serie A, Bundesliga – all free on BolaReel.',
     es: 'Mira los últimos highlights, goles y repeticiones de fútbol. Premier League, Champions League, La Liga, Serie A, Bundesliga – todo gratis en BolaReel.',
@@ -191,6 +196,24 @@ export function useSeo(locale = 'en') {
                     'query-input': 'required name=search_term_string',
                 },
             },
+        }
+    }
+
+    function matchesSeo(page = 1) {
+        const path = '/matches'
+        const base = HOME_TITLES[loc.value] || HOME_TITLES.en
+        const label = PAGE_LABEL[loc.value] || PAGE_LABEL.en
+        const title = page > 1 ? `${base} – ${label} ${page}` : base
+        const description = SITE_DESCS[loc.value] || SITE_DESCS.en
+        // Canonical tự trỏ theo page (khác home/league) để các trận cũ hơn cũng được index
+        const canonical = localUrl(loc.value, path) + (page > 1 ? `?page=${page}` : '')
+        return {
+            title,
+            fullTitle: `${title} | ${SITE_NAME}`,
+            description,
+            canonical,
+            ogLocale: OG_LOCALE[loc.value] || 'en_US',
+            alternates: buildAlternates(path),
         }
     }
 
@@ -417,5 +440,5 @@ export function useSeo(locale = 'en') {
         }
     }
 
-    return { homeSeo, matchSeo, leagueSeo, teamSeo, searchSeo }
+    return { homeSeo, matchesSeo, matchSeo, leagueSeo, teamSeo, searchSeo }
 }
