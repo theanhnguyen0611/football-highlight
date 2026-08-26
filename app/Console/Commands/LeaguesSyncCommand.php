@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class LeaguesSyncCommand extends Command
 {
-    protected $signature   = 'leagues:sync';
+    protected $signature   = 'leagues:sync {--search= : Debug — tìm tên thật của league theo từ khóa, không insert gì}';
     protected $description = 'Nạp toàn bộ danh sách league từ Highlightly (không cần match) — tránh 404 cho các giải chưa có trận gần đây';
 
     // Trùng danh sách navLeagues + moreLeagues trong AppLayout.vue — dùng để báo
@@ -25,6 +25,18 @@ class LeaguesSyncCommand extends Command
 
     public function handle(HighlightlyService $highlightly): int
     {
+        if ($keyword = $this->option('search')) {
+            $results = $highlightly->searchLeagueNames($keyword);
+            if (empty($results)) {
+                $this->warn("Không tìm thấy league nào chứa \"{$keyword}\".");
+                return self::SUCCESS;
+            }
+            foreach ($results as $r) {
+                $this->line("  id={$r['id']}  {$r['name']}");
+            }
+            return self::SUCCESS;
+        }
+
         $this->info('Syncing leagues from Highlightly...');
         $count = $highlightly->syncAllLeagues();
         $this->info("Done: {$count} league(s) upserted.");

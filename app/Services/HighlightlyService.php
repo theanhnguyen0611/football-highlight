@@ -198,6 +198,18 @@ class HighlightlyService
     // trả id "master" khác với id gắn trong object league của /matches, /highlights
     // — league đã có sẵn (tạo qua match) sẽ bị coi là league mới, đụng slug unique.
     // Nên khớp theo slug: đã có thì bỏ qua, chỉ tạo league thực sự còn thiếu.
+    // Debug: tìm tên thật của league trên Highlightly khi slug không khớp
+    // danh sách menu (vd đổi tên thương mại, viết khác đi).
+    public function searchLeagueNames(string $keyword): array
+    {
+        $keyword = mb_strtolower($keyword);
+        return collect($this->getAll('/leagues', [], maxPages: 50))
+            ->filter(fn ($l) => str_contains(mb_strtolower($l['name'] ?? ''), $keyword))
+            ->map(fn ($l) => ['id' => $l['id'] ?? null, 'name' => $l['name'] ?? null])
+            ->values()
+            ->all();
+    }
+
     public function syncAllLeagues(): int
     {
         $count = 0;
