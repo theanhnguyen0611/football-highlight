@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Nginx terminate SSL rồi proxy về Laravel qua HTTP nội bộ — không trust
+        // proxy thì Laravel không biết request gốc là HTTPS, sinh URL sai scheme
+        // (vd link phân trang ra http:// bị trình duyệt chặn vì mixed content).
+        $middleware->trustProxies(at: '*');
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\SetLocale::class,
