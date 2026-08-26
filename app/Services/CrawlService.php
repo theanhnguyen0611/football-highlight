@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Models\FootballMatch;
 use App\Models\MatchVideo;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -12,9 +13,19 @@ class CrawlService
 
     private string $sitemap = 'https://hoofoot.com/matchsitemap.php';
 
+    // Quét sitemap + 50 trang league tốn ~1 phút, mà CrawlMatchesJob (30 phút)
+    // và DasFootballJob (1 giờ) đều gọi hàm này riêng → cache lại để dùng
+    // chung, đỡ tăng gấp 3 lần traffic lên Hoofoot mỗi giờ.
+    private const LISTINGS_CACHE_TTL = 3600;
+
     // ─── Crawl sitemap → league pages → [slug => match_id] ──────
     public function crawlHoofootListings(): array
     {
+        // Không cache khi rỗng — sitemap lỗi tạm thời (mạng/Hoofoot down vài
+        // phút) mà cache cả rỗng thì chặn map video suốt 1 giờ luôn.
+        $cached = Cache::get('hoofoot:listings');
+        if ($cached) return $cached;
+
         $result = [];
 
         $xml = $this->fetch($this->sitemap);
@@ -32,6 +43,8 @@ class CrawlService
             if ($html) $this->extractHoofootSlugs($html, $result);
             sleep(1);
         }
+
+        if ($result) Cache::put('hoofoot:listings', $result, self::LISTINGS_CACHE_TTL);
 
         return $result;
     }
