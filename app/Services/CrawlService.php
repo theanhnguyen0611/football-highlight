@@ -157,9 +157,15 @@ class CrawlService
 
         if (empty($slugsByDate)) return 0;
 
+        // Ưu tiên trận MỚI trước (match_date DESC): sitemap Hoofoot trải dài
+        // 2024→nay, không giới hạn ngày, nên hàng nghìn trận cũ từ backfill —
+        // phần lớn 0 video vì Hoofoot không phủ — nếu xếp theo "số video ASC"
+        // sẽ chiếm hết $limit mỗi lượt, chặn vĩnh viễn trận vừa đá (đã có 1
+        // video DasFootball) không bao giờ được thử lại Hoofoot nữa.
         $matches = FootballMatch::with(['homeTeam', 'awayTeam', 'videos'])
             ->where('match_status', 'finished')
             ->whereIn(\DB::raw('DATE(match_date)'), array_keys($slugsByDate))
+            ->orderByDesc('match_date')
             ->orderByRaw("(SELECT COUNT(*) FROM match_videos WHERE match_videos.match_id = matches.id AND status IN ('pending','ready')) ASC")
             ->limit($limit)
             ->get();
