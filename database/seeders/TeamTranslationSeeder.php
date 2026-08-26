@@ -72,7 +72,7 @@ class TeamTranslationSeeder extends Seeder
                 'es'=>'Bolivia','pt'=>'Bolívia','fr'=>'Bolivie','de'=>'Bolivien',
                 'tr'=>'Bolivya','id'=>'Bolivia','ar'=>'بوليفيا','ja'=>'ボリビア','hi'=>'बोलिविया',
             ],
-            'Bosnia' => [
+            'Bosnia & Herzegovina' => [
                 'es'=>'Bosnia','pt'=>'Bósnia','fr'=>'Bosnie','de'=>'Bosnien',
                 'tr'=>'Bosna','id'=>'Bosnia','ar'=>'البوسنة','ja'=>'ボスニア','hi'=>'बोस्निया',
             ],
@@ -208,7 +208,7 @@ class TeamTranslationSeeder extends Seeder
                 'es'=>'Irak','pt'=>'Iraque','fr'=>'Irak','de'=>'Irak',
                 'tr'=>'Irak','id'=>'Irak','ar'=>'العراق','ja'=>'イラク','hi'=>'इराक',
             ],
-            'Ireland' => [
+            'Republic of Ireland' => [
                 'es'=>'Irlanda','pt'=>'Irlanda','fr'=>'Irlande','de'=>'Irland',
                 'tr'=>'İrlanda','id'=>'Irlandia','ar'=>'إيرلندا','ja'=>'アイルランド','hi'=>'आयरलैंड',
             ],
@@ -244,7 +244,7 @@ class TeamTranslationSeeder extends Seeder
                 'es'=>'Kenia','pt'=>'Quênia','fr'=>'Kenya','de'=>'Kenia',
                 'tr'=>'Kenya','id'=>'Kenya','ar'=>'كينيا','ja'=>'ケニア','hi'=>'केन्या',
             ],
-            'Kosovo' => [
+            'Kosovo National Team' => [
                 'es'=>'Kosovo','pt'=>'Kosovo','fr'=>'Kosovo','de'=>'Kosovo',
                 'tr'=>'Kosova','id'=>'Kosovo','ar'=>'كوسوفو','ja'=>'コソボ','hi'=>'कोसोवो',
             ],
@@ -429,7 +429,7 @@ class TeamTranslationSeeder extends Seeder
             'Liverpool'                 => ['ja'=>'リバプール','ar'=>'ليفربول','hi'=>'लिवरपूल'],
             'Manchester City'           => ['ja'=>'マンチェスター・シティ','ar'=>'مانشستر سيتي','hi'=>'मैनचेस्टर सिटी'],
             'Manchester United'         => ['ja'=>'マンチェスター・ユナイテッド','ar'=>'مانشستر يونايتد','hi'=>'मैनचेस्टर यूनाइटेड'],
-            'Newcastle'                 => ['ja'=>'ニューカッスル','ar'=>'نيوكاسل','hi'=>'न्यूकैसल'],
+            'Newcastle United'          => ['ja'=>'ニューカッスル','ar'=>'نيوكاسل','hi'=>'न्यूकैसल'],
             'Tottenham'                 => ['ja'=>'トッテナム','ar'=>'توتنهام','hi'=>'टोटेनहम'],
             'Coventry'                  => ['ja'=>'コベントリー','ar'=>'كوفنتري','hi'=>'कोवेंट्री'],
             'West Ham'                  => ['ja'=>'ウェストハム','ar'=>'ويست هام','hi'=>'वेस्ट हैम'],
@@ -439,7 +439,7 @@ class TeamTranslationSeeder extends Seeder
             'Espanyol'                  => ['ja'=>'エスパニョール','ar'=>'إسبانيول','hi'=>'एस्पान्योल'],
             'Real Betis'                => ['ja'=>'レアル・ベティス','ar'=>'ريال بيتيس','hi'=>'रियल बेटिस'],
             'Real Sociedad'             => ['ja'=>'レアル・ソシエダ','ar'=>'ريال سوسيداد','hi'=>'रियल सोसिएदाद'],
-            'Sevilla'                   => ['ja'=>'セビージャ','ar'=>'إشبيلية','hi'=>'सेविला'],
+            'Sevilla FC'                => ['ja'=>'セビージャ','ar'=>'إشبيلية','hi'=>'सेविला'],
             'Valencia'                  => ['ja'=>'バレンシア','ar'=>'فالنسيا','hi'=>'वेलेंसिया'],
             'Villarreal'                => ['ja'=>'ビジャレアル','ar'=>'فياريال','hi'=>'विलारियल'],
             'Girona'                    => ['ja'=>'ジローナ','ar'=>'جيرونا','hi'=>'जिरोना'],
@@ -475,7 +475,7 @@ class TeamTranslationSeeder extends Seeder
             'Inter Milan'               => ['ja'=>'インテル・ミラノ','ar'=>'إنتر ميلان','hi'=>'इंटर मिलान'],
             'AC Milan'                  => ['ja'=>'ACミラン','ar'=>'ميلان','hi'=>'एसी मिलान'],
             'Napoli'                    => ['ja'=>'ナポリ','ar'=>'نابولي','hi'=>'नापोली'],
-            'Roma'                      => ['ja'=>'ローマ','ar'=>'روما','hi'=>'रोमा'],
+            'AS Roma'                   => ['ja'=>'ローマ','ar'=>'روما','hi'=>'रोमा'],
             'Lazio'                     => ['ja'=>'ラツィオ','ar'=>'لاتسيو','hi'=>'लाज़ियो'],
             'Atalanta'                  => ['ja'=>'アタランタ','ar'=>'أتالانتا','hi'=>'अटलांटा'],
             'Fiorentina'                => ['ja'=>'フィオレンティーナ','ar'=>'فيورنتينا','hi'=>'फियोरेंटीना'],
