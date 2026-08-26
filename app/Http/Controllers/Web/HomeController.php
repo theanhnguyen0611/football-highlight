@@ -14,6 +14,10 @@ class HomeController extends Controller
 {
     public function index(Request $request): Response
     {
+        // Lấy Featured trước để loại các match này khỏi Latest -> không hiện trùng 2 nơi
+        $featured = $this->getFeaturedHighlights();
+        $featuredIds = array_column($featured, 'id');
+
         $query = FootballMatch::with([
             'homeTeam.translations',
             'awayTeam.translations',
@@ -21,6 +25,7 @@ class HomeController extends Controller
             'videos',
         ])
         ->whereHas('videos', fn($v) => $v->where('status', 'ready'))
+        ->when(!empty($featuredIds), fn($q) => $q->whereNotIn('id', $featuredIds))
         ->orderBy('match_date', 'desc');
 
         if ($request->filled('q')) {
@@ -43,7 +48,7 @@ class HomeController extends Controller
             'matches'             => $matches,
             'leagues'             => $this->getLeagues(),
             'popular_teams'       => $this->getPopularTeams(),
-            'featured_highlights' => $this->getFeaturedHighlights(),
+            'featured_highlights' => $featured,
             'filters'             => $request->only(['q', 'league']),
             'locale'              => app()->getLocale(),
         ]);
@@ -337,6 +342,8 @@ class HomeController extends Controller
             'thumbnail_url' => $match->thumbnail_url,
             'home_score'    => $match->home_score,
             'away_score'    => $match->away_score,
+            'venue'         => $match->venue,
+            'round'         => $match->round,
             'home_team'     => $match->homeTeam ? [
                 'id'           => $match->homeTeam->id,
                 'name'         => $match->homeTeam->name,

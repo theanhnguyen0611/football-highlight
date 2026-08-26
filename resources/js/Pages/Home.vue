@@ -42,38 +42,54 @@
                         v-for="match in featured_highlights"
                         :key="match.id"
                         :href="localePath(`/match/${match.slug}`)"
-                        class="featured-card"
+                        class="video-card"
                     >
-                        <div class="fc-thumb" :style="thumbBg(match)">
-                            <div class="fc-overlay"></div>
-                            <div class="fc-fade"></div>
-                            <div class="fc-teams">
-                                <div class="fc-team">
-                                    <div class="fc-logo">
+                        <div class="thumb" :style="thumbBg(match)">
+                            <div class="thumb-overlay"></div>
+                            <div class="thumb-fade"></div>
+
+                            <div class="thumb-teams">
+                                <div class="fb-team">
+                                    <div class="fb-logo">
                                         <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
                                         <span v-else>{{ match.home_team?.initials }}</span>
                                     </div>
-                                    <span class="fc-name">{{ teamName(match.home_team) }}</span>
+                                    <span class="fb-name">{{ teamName(match.home_team) }}</span>
                                 </div>
-                                <div class="fc-middle">
-                                    <span class="fc-vs">VS</span>
-                                    <div v-if="showScore && match.home_score != null" class="fc-score">
-                                        {{ match.home_score }} – {{ match.away_score }}
+
+                                <div class="fb-middle">
+                                    <span class="fb-vs">VS</span>
+                                    <div class="fb-score" :style="{ visibility: showScore ? 'visible' : 'hidden' }">
+                                        {{ match.home_score ?? '?' }} – {{ match.away_score ?? '?' }}
                                     </div>
                                 </div>
-                                <div class="fc-team">
-                                    <div class="fc-logo">
+
+                                <div class="fb-team">
+                                    <div class="fb-logo">
                                         <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
                                         <span v-else>{{ match.away_team?.initials }}</span>
                                     </div>
-                                    <span class="fc-name">{{ teamName(match.away_team) }}</span>
+                                    <span class="fb-name">{{ teamName(match.away_team) }}</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="fc-info">
-                            <div class="fc-meta">
-                                <span class="fc-badge-league">{{ leagueName(match.league) }}</span>
-                                <span class="fc-date">{{ formatDate(match.match_date) }}</span>
+
+                        <div class="card-info">
+                            <div class="card-teams-row">
+                                <span class="ctr-name">{{ teamName(match.home_team) }}</span>
+                                <span class="ctr-vs">{{ t('ui.vs') }}</span>
+                                <span class="ctr-name">{{ teamName(match.away_team) }}</span>
+                            </div>
+                            <div v-if="match.venue" class="card-venue">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <span>{{ match.venue }}</span>
+                            </div>
+                            <div class="card-meta">
+                                <div class="card-badges">
+                                    <span class="badge-league">{{ leagueName(match.league) }}</span>
+                                    <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
+                                </div>
+                                <span class="meta-date">{{ formatDate(match.match_date) }}</span>
                             </div>
                         </div>
                     </Link>
@@ -92,7 +108,7 @@
                         <h2 class="section-title">
                             {{ filters.q ? `${t('match.results')} "${filters.q}"` : t('match.latest') }}
                         </h2>
-                        <p class="section-sub">{{ matchList.length }} {{ t('ui.matches_available') }}</p>
+                        <p class="section-sub">{{ matches.total ?? matchList.length }} {{ t('ui.matches_available') }}</p>
                     </div>
                 </div>
             </div>
@@ -245,84 +261,6 @@ a { text-decoration: none; color: inherit; }
 }
 @media (max-width: 1200px) { .featured-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 860px)  { .featured-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
-
-.featured-card {
-    display: block; border-radius: 10px; overflow: hidden;
-    background: #16161e; border: 1px solid #26262f;
-    text-decoration: none; color: inherit;
-    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-}
-.featured-card:hover { border-color: #3a3a44; transform: translateY(-1px); box-shadow: 0 8px 28px rgba(0,0,0,0.55); }
-
-/* Thumb — giống .thumb trong grid */
-.fc-thumb {
-    position: relative; aspect-ratio: 16/9;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden; background-color: #0b0b10;
-}
-.fc-overlay {
-    position: absolute; inset: 0;
-    background: rgba(0,0,0,0.18); z-index: 0;
-}
-.fc-fade {
-    position: absolute; left: 0; right: 0; bottom: 0;
-    height: 48px;
-    background: linear-gradient(to bottom, rgba(22,22,30,0) 0%, rgba(22,22,30,0.85) 100%);
-    z-index: 1; pointer-events: none;
-}
-
-/* Teams row — giống .thumb-teams */
-.fc-teams {
-    position: relative; z-index: 2;
-    display: flex; align-items: center; justify-content: center;
-    gap: 8px; width: 100%; padding: 0 6%;
-}
-.fc-team { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; min-width: 0; }
-.fc-logo {
-    width: 80px; height: 80px; border-radius: 50%;
-    background: #fff;
-    border: 1.5px solid rgba(255,255,255,0.2);
-    display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
-}
-.fc-logo img { width: 56px; height: 56px; object-fit: contain; display: block; }
-.fc-logo span { font-size: 14px; font-weight: 700; color: #1a1a1a; }
-@media (max-width: 860px) {
-    .fc-logo { width: 56px; height: 56px; }
-    .fc-logo img { width: 38px; height: 38px; }
-    .fc-name { display: none; }
-}
-.fc-name {
-    font-size: 10px; font-weight: 700; color: #f5f5f7;
-    text-shadow: 0 1px 6px rgba(0,0,0,1), 0 0 12px rgba(0,0,0,0.9);
-    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 80px;
-}
-
-/* VS / Score — giống .fb-middle */
-.fc-middle { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
-.fc-vs {
-    font-size: 13px; font-weight: 800; color: #fff; opacity: 0.9;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.7); letter-spacing: 0.04em;
-}
-.fc-score {
-    font-size: 10px; font-weight: 700; color: #fff;
-    background: rgba(0,0,0,0.55);
-    border: 0.5px solid rgba(255,255,255,0.15);
-    padding: 2px 6px; border-radius: 5px; white-space: nowrap;
-}
-
-/* Card info — giống .card-info */
-.fc-info { padding: 7px 10px 9px; }
-.fc-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.fc-badge-league {
-    font-size: 9px; font-weight: 700; color: #ff4d6d;
-    background: rgba(224,21,82,0.1); border: 0.5px solid rgba(255,77,109,0.25);
-    padding: 2px 6px; border-radius: 4px;
-    text-transform: uppercase; letter-spacing: 0.04em;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fc-date { font-size: 10px; color: #b8b8c4; flex-shrink: 0; white-space: nowrap; }
 
 /* ── Grid ── */
 .video-grid {
