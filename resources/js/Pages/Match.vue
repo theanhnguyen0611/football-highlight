@@ -775,18 +775,29 @@ a { text-decoration: none; color: inherit; }
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 16px; background: #0d0d12;
+    gap: 16px;
+    background:
+        radial-gradient(ellipse at center, rgba(224,21,82,0.14) 0%, transparent 65%),
+        #0d0d12;
 }
-.ph-teams { display: flex; align-items: center; gap: 20px; }
+.ph-teams { display: flex; align-items: center; gap: 24px; }
 .ph-logo {
-    width: 72px; height: 72px; border-radius: 50%;
+    width: 88px; height: 88px; border-radius: 50%;
     background: #fff; border: 1.5px solid rgba(255,255,255,0.15);
     display: flex; align-items: center; justify-content: center; overflow: hidden;
+    box-shadow: 0 0 0 6px rgba(255,255,255,0.04);
 }
-.ph-logo img { width: 50px; height: 50px; object-fit: contain; }
-.ph-logo span { font-size: 16px; font-weight: 700; color: #1a1a1a; }
-.ph-vs { font-size: 22px; font-weight: 800; color: rgba(255,255,255,0.6); }
+.ph-logo img { width: 62px; height: 62px; object-fit: contain; }
+.ph-logo span { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+.ph-vs { font-size: 26px; font-weight: 800; color: rgba(255,255,255,0.6); }
 .ph-label { font-size: 13px; color: #c0c0cc; }
+@media (min-width: 768px) {
+    .ph-teams { gap: 40px; }
+    .ph-logo { width: 120px; height: 120px; }
+    .ph-logo img { width: 84px; height: 84px; }
+    .ph-logo span { font-size: 24px; }
+    .ph-vs { font-size: 34px; }
+}
 
 /* ── Source bar ── */
 .src-bar {
