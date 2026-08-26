@@ -199,6 +199,7 @@
 import { Link, router } from '@inertiajs/vue3'
 import { ref, computed, toRef, onMounted, onUnmounted } from 'vue'
 import { useLocale } from '@/composables/useLocale'
+import { FAMOUS_TEAM_SLUGS } from '@/constants/famousTeams'
 
 const props = defineProps({
     leagues:       { type: Array,  default: () => [] },
@@ -270,16 +271,6 @@ const languages = [
 ]
 
 const currentLang = computed(() => languages.find(l => l.code === currentLocale.value) || languages[0])
-
-const FAMOUS_TEAM_SLUGS = [
-    'real-madrid', 'barcelona', 'manchester-city', 'manchester-united',
-    'liverpool', 'chelsea', 'arsenal', 'tottenham',
-    'paris-saint-germain', 'bayern-munich', 'borussia-dortmund',
-    'juventus', 'ac-milan', 'inter-milan', 'napoli',
-    'atletico-madrid', 'ajax', 'benfica', 'porto',
-    'river-plate', 'boca-juniors', 'flamengo', 'palmeiras',
-    'galatasaray', 'fenerbahce',
-]
 
 const footerTeams = computed(() => {
     const all = props.popularTeams ?? []

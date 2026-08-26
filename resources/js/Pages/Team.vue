@@ -109,7 +109,10 @@
                             <span class="ctr-name" :class="{ 'ctr-highlighted': match.away_team?.id === team.id }">{{ teamName(match.away_team) }}</span>
                         </div>
                         <div class="card-meta">
-                            <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
+                            <div class="card-badges">
+                                <span v-if="isHotMatch(match)" class="badge-hot">🔥 HOT</span>
+                                <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
+                            </div>
                             <span class="meta-date">{{ formatDate(match.match_date) }}</span>
                         </div>
                     </div>
@@ -139,6 +142,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import { computed, toRef } from 'vue'
 import { useLocale } from '@/composables/useLocale'
 import { useSeo, injectJsonLd } from '@/composables/useSeo'
+import { isHotMatch } from '@/constants/famousTeams'
 
 const props = defineProps({
     team:          Object,
@@ -337,6 +341,15 @@ a { text-decoration: none; color: inherit; }
 .ctr-vs { font-size: 10px; color: #a8a8b4; flex-shrink: 0; }
 
 .card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card-badges { display: flex; align-items: center; gap: 5px; overflow: hidden; flex: 1; min-width: 0; }
+.badge-hot {
+    font-size: 9.5px; font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #ff8a00, #e01552);
+    padding: 3px 7px; border-radius: 4px;
+    letter-spacing: 0.02em;
+    white-space: nowrap; flex-shrink: 0;
+}
 .badge-round {
     font-size: 10px; font-weight: 600; color: #b8b8c8;
     background: #1c1c26; border: 0.5px solid #26262f;

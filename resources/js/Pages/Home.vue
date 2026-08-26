@@ -85,6 +85,7 @@
                             </div>
                             <div class="card-meta">
                                 <div class="card-badges">
+                                    <span v-if="isHotMatch(match)" class="badge-hot">🔥 HOT</span>
                                     <span class="badge-league">{{ leagueName(match.league) }}</span>
                                     <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
                                 </div>
@@ -191,6 +192,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import { computed, toRef, ref } from 'vue'
 import { useLocale } from '@/composables/useLocale'
 import { useSeo, injectJsonLd } from '@/composables/useSeo'
+import { isHotMatch } from '@/constants/famousTeams'
 
 const props = defineProps({
     matches:              Object,
@@ -408,6 +410,14 @@ a { text-decoration: none; color: inherit; }
     border: 0.5px solid rgba(255,77,109,0.25);
     padding: 3px 7px; border-radius: 4px;
     text-transform: uppercase; letter-spacing: 0.04em;
+    white-space: nowrap; flex-shrink: 0;
+}
+.badge-hot {
+    font-size: 9.5px; font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #ff8a00, #e01552);
+    padding: 3px 7px; border-radius: 4px;
+    letter-spacing: 0.02em;
     white-space: nowrap; flex-shrink: 0;
 }
 .badge-round {
