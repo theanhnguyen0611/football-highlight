@@ -692,8 +692,13 @@ a { text-decoration: none; color: inherit; }
 .plyr-container { width: 100%; height: 100%; }
 
 /* Poster thường lộ tỉ số (graphic của đài) — làm mờ tới khi tự bấm "Hiện
-   tỉ số" hoặc bắt đầu play (lúc đó video thật thay chỗ poster, hết cần mờ). */
-.poster-blur video { filter: blur(24px); transform: scale(1.1); }
+   tỉ số" hoặc bắt đầu play (lúc đó video thật thay chỗ poster, hết cần mờ).
+   Plyr không dùng poster gốc của <video>, nó tự vẽ .plyr__poster đè lên. */
+.poster-blur .plyr__poster,
+.poster-blur video {
+    filter: blur(24px);
+    transform: scale(1.1);
+}
 
 /* ── Click area + flash ── */
 .player-click-area {
