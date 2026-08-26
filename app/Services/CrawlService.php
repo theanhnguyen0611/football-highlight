@@ -203,12 +203,10 @@ class CrawlService
                 }
             }
 
-            // Backup: chỉ chạy khi không có video Hoofoot nào dùng được, và trận đã
-            // đá đủ 2 ngày — nhường thời gian cho Hoofoot cập nhật trước, tránh
-            // DasFootball "cướp" link trước rồi trận bị hạ ưu tiên, không thử lại
-            // Hoofoot nữa (do ORDER BY số video ASC + LIMIT ở query bên trên).
-            $matchAgeDays = $match->match_date->diffInDays(now());
-            if ($tryDasFootball && !$hoofootVideo && !$hasDasFB && $matchAgeDays >= 2) {
+            // Backup: chỉ chạy khi không có video Hoofoot nào dùng được, chỉ 1 lần
+            // mỗi trận (guard !$hasDasFB). Cả 2 nguồn chạy song song, nếu sau đó
+            // Hoofoot ra thêm thì cả 2 cùng hiển thị trên trang xem (không thay thế).
+            if ($tryDasFootball && !$hoofootVideo && !$hasDasFB) {
                 $video = $this->crawlDasFootball($match);
                 if ($video) {
                     MatchVideo::updateOrCreate(
