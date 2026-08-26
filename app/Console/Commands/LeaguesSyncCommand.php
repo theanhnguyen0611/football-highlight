@@ -16,11 +16,11 @@ class LeaguesSyncCommand extends Command
     private array $menuSlugs = [
         'premier-league', 'uefa-champions-league', 'la-liga', 'bundesliga', 'serie-a',
         'ligue-1', 'uefa-europa-league', 'copa-america', 'euro-championship', 'world-cup',
-        'international-friendlies',
+        'friendlies',
         'concacaf-champions-league', 'major-league-soccer', 'super-lig', 'eredivisie',
         'primeira-liga', 'championship', 'league-cup', 'fa-cup', 'dfb-pokal',
         'coupe-de-france', 'copa-del-rey', 'coppa-italia', 'uefa-nations-league',
-        'concacaf-gold-cup', 'saudi-pro-league', 'club-friendlies',
+        'concacaf-gold-cup', 'saudi-pro-league', 'friendlies-clubs',
     ];
 
     public function handle(HighlightlyService $highlightly): int

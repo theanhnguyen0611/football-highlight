@@ -28,6 +28,12 @@ class HighlightlyService
     // WCQ logo: dùng chung logo WCQ Europe (đẹp nhất, phổ biến nhất)
     private const WCQ_LOGO = 'https://highlightly.net/soccer/images/leagues/28016.png';
 
+    // Highlightly đặt tên chung chung "Pro League" cho nhiều nước (Bỉ, Iran, Ả
+    // Rập...) không phân biệt được — đè tên rõ ràng theo id đã biết.
+    private const LEAGUE_NAME_OVERRIDES = [
+        262041 => 'Saudi Pro League',
+    ];
+
     // Các league ID được gộp thành 1 league ảo trong DB
     private const LEAGUE_GROUP_MAP = [
         25463 => ['id' => 99999, 'name' => 'World Cup Qualifier', 'logo' => self::WCQ_LOGO],
@@ -187,17 +193,6 @@ class HighlightlyService
         return ['matches' => $matchCount, 'thumbnails' => $thumbCount];
     }
 
-    // ─── Nạp toàn bộ danh sách league từ Highlightly, không phụ thuộc match ───
-    // Bình thường League chỉ được tạo khi có match đi qua syncDate() (bước A ở
-    // trên) — nên giải đấu không có trận trong khoảng ngày crawl (vd Euro giữa
-    // 2 kỳ) sẽ không tồn tại trong DB, trang /league/{slug} bị 404. Gọi thẳng
-    // /leagues để có League row (tên, logo, highlightly_id) trước, không cần chờ
-    // match.
-    //
-    // KHÔNG dùng upsertLeague() (khớp theo highlightly_id): endpoint /leagues
-    // trả id "master" khác với id gắn trong object league của /matches, /highlights
-    // — league đã có sẵn (tạo qua match) sẽ bị coi là league mới, đụng slug unique.
-    // Nên khớp theo slug: đã có thì bỏ qua, chỉ tạo league thực sự còn thiếu.
     // Debug: tìm tên thật của league trên Highlightly khi slug không khớp
     // danh sách menu (vd đổi tên thương mại, viết khác đi).
     public function searchLeagueNames(string $keyword): array
@@ -210,17 +205,38 @@ class HighlightlyService
             ->all();
     }
 
+    // ─── Nạp toàn bộ danh sách league từ Highlightly, không phụ thuộc match ───
+    // Bình thường League chỉ được tạo khi có match đi qua syncDate() (bước A ở
+    // trên) — nên giải đấu không có trận trong khoảng ngày crawl (vd Euro giữa
+    // 2 kỳ) sẽ không tồn tại trong DB, trang /league/{slug} bị 404. Gọi thẳng
+    // /leagues để có League row (tên, logo, highlightly_id) trước, không cần chờ
+    // match.
+    //
+    // KHÔNG dùng upsertLeague() (khớp theo highlightly_id): endpoint /leagues
+    // trả id "master" khác với id gắn trong object league của /matches, /highlights
+    // — league đã có sẵn (tạo qua match) sẽ bị coi là league mới, đụng slug unique.
+    // Nên khớp theo slug: đã có thì bỏ qua, chỉ tạo league thực sự còn thiếu.
     public function syncAllLeagues(): int
     {
         $count = 0;
         foreach ($this->getAll('/leagues', [], maxPages: 50) as $l) {
             if (empty($l['name'])) continue;
-            $slug = Str::slug($l['name']);
+            $name = self::LEAGUE_NAME_OVERRIDES[$l['id'] ?? null] ?? $l['name'];
+            $slug = Str::slug($name);
+
+            // League đã có sẵn theo id (vd tạo từ trước với tên chung chung của
+            // Highlightly) nhưng chưa khớp override → sửa tên/slug luôn.
+            $byId = isset($l['id']) ? League::where('highlightly_id', $l['id'])->first() : null;
+            if ($byId) {
+                if ($byId->slug !== $slug) $byId->update(['name' => $name, 'slug' => $slug]);
+                continue;
+            }
+
             if (League::where('slug', $slug)->exists()) continue;
 
             try {
                 League::create([
-                    'name'           => $l['name'],
+                    'name'           => $name,
                     'slug'           => $slug,
                     'logo_path'      => $l['logo'] ?? null,
                     'highlightly_id' => $l['id'] ?? null,
@@ -487,6 +503,7 @@ class HighlightlyService
     {
         if (!$l) return null;
 
+        $name   = self::LEAGUE_NAME_OVERRIDES[$l['id']] ?? $l['name'];
         $league = League::where('highlightly_id', $l['id'])->first();
 
         // Id gắn trong object league của /matches, /highlights có thể khác id
@@ -494,12 +511,12 @@ class HighlightlyService
         // highlightly_id thì thử theo slug trước khi insert mới, tránh đụng
         // slug unique và crash cả vòng sync.
         if (!$league) {
-            $league = League::where('slug', Str::slug($l['name']))->first();
+            $league = League::where('slug', Str::slug($name))->first();
         }
 
         if ($league) {
             $league->update([
-                'name'           => $l['name'],
+                'name'           => $name,
                 'logo_path'      => $l['logo'] ?? null,
                 'highlightly_id' => $l['id'],
             ]);
@@ -507,8 +524,8 @@ class HighlightlyService
         }
 
         return League::create([
-            'name'           => $l['name'],
-            'slug'           => Str::slug($l['name']),
+            'name'           => $name,
+            'slug'           => Str::slug($name),
             'logo_path'      => $l['logo'] ?? null,
             'highlightly_id' => $l['id'],
         ]);

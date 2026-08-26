@@ -235,7 +235,7 @@ const navLeagues = [
     { slug: 'copa-america',          name: 'Copa América',     abbr: 'CA',  logo: '/storage/logos/leagues/copa-america.png' },
     { slug: 'euro-championship',     name: 'EURO',             abbr: 'EUR', logo: '/storage/logos/leagues/euro-championship.png' },
     { slug: 'world-cup',             name: 'World Cup',        abbr: 'WC',  logo: '/storage/logos/leagues/world-cup.png' },
-    { slug: 'international-friendlies', name: 'International Friendlies', abbr: 'INT', logo: '/storage/logos/leagues/friendlies.png', dark: true },
+    { slug: 'friendlies',            name: 'International Friendlies', abbr: 'INT', logo: '/storage/logos/leagues/friendlies.png', dark: true },
 ]
 
 const moreLeagues = [
@@ -254,7 +254,7 @@ const moreLeagues = [
     { slug: 'uefa-nations-league',       name: 'UEFA Nations League',abbr: 'UNL', logo: '/storage/logos/leagues/uefa-nations-league.png' },
     { slug: 'concacaf-gold-cup',         name: 'CONCACAF Gold Cup',  abbr: 'CGC', logo: '/storage/logos/leagues/concacaf-gold-cup.png' },
     { slug: 'saudi-pro-league',          name: 'Saudi Pro League',   abbr: 'SPL', logo: '/storage/logos/leagues/saudi-pro-league.png' },
-    { slug: 'club-friendlies',           name: 'Club Friendlies',    abbr: 'CLB', logo: '/storage/logos/leagues/friendlies.png' },
+    { slug: 'friendlies-clubs',           name: 'Club Friendlies',    abbr: 'CLB', logo: '/storage/logos/leagues/friendlies.png' },
 ]
 
 const languages = [
