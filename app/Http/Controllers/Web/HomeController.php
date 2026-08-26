@@ -280,29 +280,16 @@ class HomeController extends Controller
             'argentina', 'france', 'spain', 'germany', 'england', 'brazil', 'portugal',
         ];
 
-        // 1 query duy nhất: lấy top-team match mới nhất trước, giới hạn an toàn
-        // đủ rộng (16 đội top khó có quá 50 trận/ngày), rồi lọc trong PHP những
-        // trận cùng ngày với trận mới nhất — khỏi cần query MAX() riêng.
-        $matches = FootballMatch::with(['homeTeam.translations', 'awayTeam.translations', 'league', 'videos'])
+        return FootballMatch::with(['homeTeam.translations', 'awayTeam.translations', 'league', 'videos'])
+            ->where('match_date', '>=', now()->subDays(7))
             ->whereHas('videos', fn($v) => $v->where('status', 'ready'))
             ->where(function ($q) use ($teamSlugs) {
                 $q->whereHas('homeTeam', fn($t) => $t->whereIn('slug', $teamSlugs))
                   ->orWhereHas('awayTeam', fn($t) => $t->whereIn('slug', $teamSlugs));
             })
             ->orderBy('match_date', 'desc')
-            ->limit(50)
-            ->get();
-
-        if ($matches->isEmpty()) {
-            return [];
-        }
-
-        $latestDate = \Illuminate\Support\Carbon::parse($matches->first()->match_date)->toDateString();
-
-        return $matches
-            ->filter(fn($m) => \Illuminate\Support\Carbon::parse($m->match_date)->toDateString() === $latestDate)
+            ->get()
             ->map(fn($m) => $this->serializeRelated($m))
-            ->values()
             ->toArray();
     }
 
