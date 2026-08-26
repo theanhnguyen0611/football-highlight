@@ -46,7 +46,7 @@
                             <p class="ph-label">{{ t('match.no_video') }}</p>
                         </div>
 
-                        <div v-show="hasVideo" class="plyr-container">
+                        <div v-show="hasVideo" class="plyr-container" :class="{ 'poster-blur': !scoreVisible && !isPlaying }">
                             <video ref="videoEl" playsinline :poster="match.thumbnail_url || undefined"></video>
                         </div>
 
@@ -690,6 +690,10 @@ a { text-decoration: none; color: inherit; }
     margin-bottom: 12px;
 }
 .plyr-container { width: 100%; height: 100%; }
+
+/* Poster thường lộ tỉ số (graphic của đài) — làm mờ tới khi tự bấm "Hiện
+   tỉ số" hoặc bắt đầu play (lúc đó video thật thay chỗ poster, hết cần mờ). */
+.poster-blur video { filter: blur(24px); transform: scale(1.1); }
 
 /* ── Click area + flash ── */
 .player-click-area {
