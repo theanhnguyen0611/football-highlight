@@ -187,6 +187,21 @@ class HighlightlyService
         return ['matches' => $matchCount, 'thumbnails' => $thumbCount];
     }
 
+    // ─── Nạp toàn bộ danh sách league từ Highlightly, không phụ thuộc match ───
+    // Bình thường League chỉ được tạo khi có match đi qua syncDate() (bước A ở
+    // trên) — nên giải đấu không có trận trong khoảng ngày crawl (vd Euro giữa
+    // 2 kỳ) sẽ không tồn tại trong DB, trang /league/{slug} bị 404. Gọi thẳng
+    // /leagues để có League row (tên, logo, highlightly_id) trước, không cần chờ
+    // match.
+    public function syncAllLeagues(): int
+    {
+        $count = 0;
+        foreach ($this->getAll('/leagues') as $l) {
+            if ($this->upsertLeague($l)) $count++;
+        }
+        return $count;
+    }
+
     // ─── Sync venue + events cho finished matches chưa được detail ───
     // Retry nếu score vẫn NULL dù đã sync (API chậm hơn trận kết thúc).
     public function syncFinishedMatchDetails(int $limit = 30): int
