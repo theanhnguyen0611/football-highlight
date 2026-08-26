@@ -86,9 +86,16 @@ class CrawlMatchesCommand extends Command
             return self::SUCCESS;
         }
 
+        // Step 2 cũng ăn quota (gọi /matches/{id} từng trận) nên vẫn có thể ném
+        // giữa chừng. Step 3-4 chạy trên Hoofoot, không dính Highlightly — hết
+        // quota thì cảnh báo rồi đi tiếp, đừng bỏ luôn phần map/tải video.
         $this->info('Step 2: Syncing details for finished matches...');
-        $detailed = $highlightly->syncFinishedMatchDetails(limit: $detailsLimit);
-        $this->line("  Detailed: {$detailed} matches");
+        try {
+            $detailed = $highlightly->syncFinishedMatchDetails(limit: $detailsLimit);
+            $this->line("  Detailed: {$detailed} matches");
+        } catch (HighlightlyQuotaException $e) {
+            $this->warn('  Bỏ qua chi tiết trận: ' . $e->getMessage());
+        }
 
         $this->info('Step 3: Crawling Hoofoot listings...');
         $listings = $crawl->crawlHoofootListings();

@@ -206,8 +206,21 @@ class HighlightlyService
 
         $count = 0;
         foreach ($matches as $match) {
-            $result = $this->syncMatchDetails($match->id, $match->highlightly_id);
-            if ($result['events'] > 0 || $result['venue'] || $result['score']) $count++;
+            // Một match lỗi không được kéo sập cả batch: trước đây payload dị
+            // dạng của Highlightly làm văng giữa vòng lặp, những match phía sau
+            // không bao giờ được sync.
+            try {
+                $result = $this->syncMatchDetails($match->id, $match->highlightly_id);
+                if ($result['events'] > 0 || $result['venue'] || $result['score']) $count++;
+            } catch (HighlightlyQuotaException $e) {
+                throw $e; // hết quota là lỗi toàn cục — phải dừng, không nuốt
+            } catch (\Throwable $e) {
+                Log::warning('Highlightly: syncMatchDetails thất bại', [
+                    'match_id'       => $match->id,
+                    'highlightly_id' => $match->highlightly_id,
+                    'error'          => $e->getMessage(),
+                ]);
+            }
             sleep(1);
         }
 
@@ -220,10 +233,10 @@ class HighlightlyService
     {
         $res    = $this->get("/matches/{$highlightlyMatchId}");
         $detail = $res[0] ?? null;
-        if (!$detail) return ['venue' => false, 'events' => 0];
+        if (!$detail) return ['venue' => false, 'events' => 0, 'score' => false];
 
         $match = FootballMatch::with(['homeTeam', 'awayTeam'])->find($matchId);
-        if (!$match) return ['venue' => false, 'events' => 0];
+        if (!$match) return ['venue' => false, 'events' => 0, 'score' => false];
 
         $updates = [];
         $scoreUpdated = false;
@@ -299,10 +312,23 @@ class HighlightlyService
             $type    = self::EVENT_TYPE_MAP[$apiType] ?? null;
             if (!$type) continue;
 
+            // Ternary cũ chỉ có 2 nhánh: mọi event không khớp home — kể cả khi
+            // payload thiếu hẳn field `team` — đều rơi vào awayTeam, tức bàn
+            // thắng bị gán nhầm đội. Không khớp đội nào thì bỏ qua, đừng đoán.
             $teamHighlightlyId = $e['team']['id'] ?? null;
-            $team = $match->homeTeam->highlightly_id == $teamHighlightlyId
-                ? $match->homeTeam
-                : $match->awayTeam;
+            $team = match (true) {
+                $match->homeTeam?->highlightly_id == $teamHighlightlyId => $match->homeTeam,
+                $match->awayTeam?->highlightly_id == $teamHighlightlyId => $match->awayTeam,
+                default => null,
+            };
+            if (!$team) {
+                Log::warning('Highlightly: event không khớp đội nào, bỏ qua', [
+                    'match_id' => $match->id,
+                    'team_id'  => $teamHighlightlyId,
+                    'type'     => $apiType,
+                ]);
+                continue;
+            }
 
             MatchEvent::create([
                 'match_id'    => $match->id,
