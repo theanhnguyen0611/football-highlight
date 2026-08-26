@@ -193,11 +193,31 @@ class HighlightlyService
     // 2 kỳ) sẽ không tồn tại trong DB, trang /league/{slug} bị 404. Gọi thẳng
     // /leagues để có League row (tên, logo, highlightly_id) trước, không cần chờ
     // match.
+    //
+    // KHÔNG dùng upsertLeague() (khớp theo highlightly_id): endpoint /leagues
+    // trả id "master" khác với id gắn trong object league của /matches, /highlights
+    // — league đã có sẵn (tạo qua match) sẽ bị coi là league mới, đụng slug unique.
+    // Nên khớp theo slug: đã có thì bỏ qua, chỉ tạo league thực sự còn thiếu.
     public function syncAllLeagues(): int
     {
         $count = 0;
         foreach ($this->getAll('/leagues') as $l) {
-            if ($this->upsertLeague($l)) $count++;
+            if (empty($l['name'])) continue;
+            $slug = Str::slug($l['name']);
+            if (League::where('slug', $slug)->exists()) continue;
+
+            try {
+                League::create([
+                    'name'           => $l['name'],
+                    'slug'           => $slug,
+                    'logo_path'      => $l['logo'] ?? null,
+                    'highlightly_id' => $l['id'] ?? null,
+                ]);
+                $count++;
+            } catch (\Illuminate\Database\QueryException $e) {
+                // vd highlightly_id trùng với 1 league đã tồn tại dưới slug khác
+                Log::warning('syncAllLeagues: skip league lỗi insert', ['name' => $l['name'], 'error' => $e->getMessage()]);
+            }
         }
         return $count;
     }
