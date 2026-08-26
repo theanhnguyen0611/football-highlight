@@ -201,7 +201,7 @@ class HighlightlyService
     public function syncAllLeagues(): int
     {
         $count = 0;
-        foreach ($this->getAll('/leagues') as $l) {
+        foreach ($this->getAll('/leagues', [], maxPages: 50) as $l) {
             if (empty($l['name'])) continue;
             $slug = Str::slug($l['name']);
             if (League::where('slug', $slug)->exists()) continue;
@@ -474,14 +474,31 @@ class HighlightlyService
     private function upsertLeague(?array $l): ?League
     {
         if (!$l) return null;
-        return League::updateOrCreate(
-            ['highlightly_id' => $l['id']],
-            [
+
+        $league = League::where('highlightly_id', $l['id'])->first();
+
+        // Id gắn trong object league của /matches, /highlights có thể khác id
+        // "master" ở /leagues (đã gặp với premier-league) — không match theo
+        // highlightly_id thì thử theo slug trước khi insert mới, tránh đụng
+        // slug unique và crash cả vòng sync.
+        if (!$league) {
+            $league = League::where('slug', Str::slug($l['name']))->first();
+        }
+
+        if ($league) {
+            $league->update([
                 'name'           => $l['name'],
-                'slug'           => Str::slug($l['name']),
                 'logo_path'      => $l['logo'] ?? null,
                 'highlightly_id' => $l['id'],
-            ]
-        );
+            ]);
+            return $league;
+        }
+
+        return League::create([
+            'name'           => $l['name'],
+            'slug'           => Str::slug($l['name']),
+            'logo_path'      => $l['logo'] ?? null,
+            'highlightly_id' => $l['id'],
+        ]);
     }
 }
