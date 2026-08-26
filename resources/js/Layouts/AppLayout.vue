@@ -332,6 +332,7 @@ a { text-decoration: none; color: inherit; }
 .topbar-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex: 1; }
 .logo { display: flex; align-items: center; position: absolute; left: 50%; transform: translateX(-50%); }
 .logo-img { height: 32px; width: auto; display: block; }
+@media (min-width: 769px) { .logo-img { height: 42px; } }
 
 .action-btn { width: 38px; height: 38px; border-radius: 50%; background: none; border: none; color: #ef4444; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
 .action-btn:hover { background: #2a2a2a; }

@@ -282,6 +282,8 @@ class HomeController extends Controller
             // Clubs
             'real-madrid', 'barcelona', 'manchester-city', 'liverpool', 'manchester-united',
             'arsenal', 'chelsea', 'bayern-munich', 'paris-saint-germain',
+            'juventus', 'ac-milan', 'inter-milan', 'napoli', 'borussia-dortmund',
+            'atletico-madrid', 'tottenham',
             // National teams
             'argentina', 'france', 'spain', 'germany', 'england', 'brazil', 'portugal',
         ];

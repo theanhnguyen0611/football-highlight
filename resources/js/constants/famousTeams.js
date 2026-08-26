@@ -8,6 +8,17 @@ export const FAMOUS_TEAM_SLUGS = [
     'galatasaray', 'fenerbahce',
 ]
 
+// Trùng tiêu chí Featured Highlights (HomeController::getFeaturedHighlights) - dùng cho badge Hot
+const HOT_TEAM_SLUGS = [
+    // Clubs
+    'real-madrid', 'barcelona', 'manchester-city', 'liverpool', 'manchester-united',
+    'arsenal', 'chelsea', 'bayern-munich', 'paris-saint-germain',
+    'juventus', 'ac-milan', 'inter-milan', 'napoli', 'borussia-dortmund',
+    'atletico-madrid', 'tottenham',
+    // National teams
+    'argentina', 'france', 'spain', 'germany', 'england', 'brazil', 'portugal',
+]
+
 export function isHotMatch(match) {
-    return FAMOUS_TEAM_SLUGS.includes(match?.home_team?.slug) || FAMOUS_TEAM_SLUGS.includes(match?.away_team?.slug)
+    return HOT_TEAM_SLUGS.includes(match?.home_team?.slug) || HOT_TEAM_SLUGS.includes(match?.away_team?.slug)
 }
