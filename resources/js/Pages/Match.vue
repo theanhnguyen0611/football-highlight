@@ -46,8 +46,23 @@
                             <p class="ph-label">{{ t('match.no_video') }}</p>
                         </div>
 
-                        <div v-show="hasVideo" class="plyr-container" :class="{ 'poster-blur': !scoreVisible && !hasStarted }">
-                            <video ref="videoEl" playsinline :poster="match.thumbnail_url || undefined"></video>
+                        <div v-show="hasVideo" class="plyr-container">
+                            <video ref="videoEl" playsinline></video>
+                        </div>
+
+                        <!-- Poster mặc định (không dùng thumbnail thật vì hay lộ tỉ số) -->
+                        <div v-if="hasVideo && !hasStarted" class="player-placeholder">
+                            <div class="ph-teams">
+                                <div class="ph-logo">
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <span v-else>{{ match.home_team?.initials }}</span>
+                                </div>
+                                <span class="ph-vs">VS</span>
+                                <div class="ph-logo">
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <span v-else>{{ match.away_team?.initials }}</span>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Click overlay: toggle play/pause -->
@@ -334,7 +349,7 @@ injectJsonLd(computed(() => seo.value.jsonLd))
 
 const videoEl        = ref(null)
 const scoreVisible   = ref(false)
-const hasStarted     = ref(false) // true khi đã play lần đầu — pause giữa chừng không mờ lại
+const hasStarted     = ref(false) // true khi đã play lần đầu — ẩn poster team logo, không hiện lại khi pause
 const activeTab      = ref('events')
 const activeVideoIdx = ref(0)
 const isPlaying      = ref(false)
@@ -659,15 +674,6 @@ onUnmounted(() => {
     padding-left: 4px;
 }
 
-/* Poster thường lộ tỉ số (graphic của đài) — làm mờ tới khi tự bấm "Hiện
-   tỉ số" hoặc bắt đầu play (lúc đó video thật thay chỗ poster, hết cần mờ).
-   .plyr__poster do Plyr tự tạo bằng JS, không có data-v- của Vue nên rule
-   này BẮT BUỘC phải nằm ở style global (không phải scoped) mới khớp được. */
-.poster-blur .plyr__poster,
-.poster-blur video {
-    filter: blur(14px);
-    transform: scale(1.06);
-}
 </style>
 
 <style scoped>
