@@ -138,9 +138,9 @@ class CrawlService
         }, ARRAY_FILTER_USE_BOTH);
     }
 
-    // ─── Find + save video records: Hoofoot là nguồn chính, DasFootball là backup ─
-    // DasFootball CHỈ chạy khi không có video Hoofoot dùng được — nó tốn Playwright
-    // nên không thử song song.
+    // ─── Find + save video records: Hoofoot + DasFootball crawl độc lập ─────
+    // Mỗi nguồn tự guard theo chính nó (đã có row pending/ready thì bỏ qua),
+    // không phụ thuộc nguồn kia — cả 2 cùng hiển thị song song trên trang xem.
     // Match chỉ hiển thị khi có ít nhất 1 video ready (filter ở HomeController).
     public function findAndMapVideos(array $listings, int $limit = 100, bool $tryDasFootball = false): int
     {

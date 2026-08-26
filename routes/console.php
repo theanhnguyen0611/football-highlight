@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schedule;
 // → ~2600 req/ngày ở worst case, ~1600 ở steady state.
 Schedule::job(new CrawlMatchesJob)->everyThirtyMinutes();
 
-// DasFootball fallback mỗi giờ (dùng Playwright, chậm hơn)
+// DasFootball mỗi giờ, độc lập với Hoofoot (dùng Playwright, chậm hơn)
 Schedule::job(new DasFootballJob)->hourly();
 
 // Download videos mỗi 15 phút

@@ -26,7 +26,7 @@ class DasFootballJob implements ShouldQueue, ShouldBeUnique
     {
         Log::info('DasFootballJob: start');
 
-        $listings = $crawl->crawlHoofootRecentSlugs(days: 3);
+        $listings = $crawl->crawlHoofootRecentSlugs(days: 14);
         $mapped   = $crawl->findAndMapVideos($listings, limit: 40, tryDasFootball: true);
 
         Log::info('DasFootballJob: done', ['mapped' => $mapped]);
