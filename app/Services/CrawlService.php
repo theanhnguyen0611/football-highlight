@@ -120,24 +120,6 @@ class CrawlService
         return $code;
     }
 
-    // ─── Lấy recent slugs từ sitemap chính (không crawl league pages) ─
-    // Dùng cho cron: nhanh, chỉ lấy entries trong N ngày gần nhất.
-    public function crawlHoofootRecentSlugs(int $days = 2): array
-    {
-        $result = [];
-        $xml = $this->fetch($this->sitemap);
-        if (!$xml) return $result;
-
-        $this->extractHoofootSlugs($xml, $result);
-
-        $cutoff = now()->subDays($days)->format('Y-m-d');
-        return array_filter($result, function ($matchId, $slug) use ($cutoff) {
-            $parts   = explode('_', $slug);
-            $dateStr = implode('-', array_slice($parts, -3));
-            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr) && $dateStr >= $cutoff;
-        }, ARRAY_FILTER_USE_BOTH);
-    }
-
     // ─── Find + save video records: Hoofoot + DasFootball crawl độc lập ─────
     // Mỗi nguồn tự guard theo chính nó (đã có row pending/ready thì bỏ qua),
     // không phụ thuộc nguồn kia — cả 2 cùng hiển thị song song trên trang xem.
