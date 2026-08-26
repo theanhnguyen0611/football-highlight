@@ -458,12 +458,9 @@ const statsGroups = computed(() => {
     })).filter(g => g.rows.length)
 })
 
-const playableVideos = computed(() => {
-    const ready = props.match.videos?.filter(v => v.status === 'ready') ?? []
-    const hasHoofoot = ready.some(v => v.source === 'hoofoot')
-    // DasFootball chỉ hiện nếu không có Hoofoot (backup)
-    return hasHoofoot ? ready.filter(v => v.source !== 'dasfootball') : ready
-})
+const playableVideos = computed(() =>
+    props.match.videos?.filter(v => v.status === 'ready') ?? []
+)
 
 const highlightVideos = computed(() =>
     playableVideos.value.filter(v => v.video_type !== 'full_match')

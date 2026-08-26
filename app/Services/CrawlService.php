@@ -203,10 +203,10 @@ class CrawlService
                 }
             }
 
-            // Backup: chỉ chạy khi không có video Hoofoot nào dùng được, chỉ 1 lần
-            // mỗi trận (guard !$hasDasFB). Cả 2 nguồn chạy song song, nếu sau đó
-            // Hoofoot ra thêm thì cả 2 cùng hiển thị trên trang xem (không thay thế).
-            if ($tryDasFootball && !$hoofootVideo && !$hasDasFB) {
+            // DasFootball tự guard theo chính nó (!$hasDasFB), không phụ thuộc
+            // Hoofoot đã có hay chưa — 2 nguồn crawl độc lập, mỗi nguồn tối đa
+            // 1 lần/trận, cả 2 cùng hiển thị song song trên trang xem.
+            if ($tryDasFootball && !$hasDasFB) {
                 $video = $this->crawlDasFootball($match);
                 if ($video) {
                     MatchVideo::updateOrCreate(
