@@ -27,3 +27,6 @@ Schedule::job(new DownloadVideosJob)->everyFifteenMinutes();
 // --prune-dasfootball: xoá video DasFootball khi Hoofoot đã có video ready
 // cho cùng trận (tránh hiển thị trùng 2 highlight khi Hoofoot đến muộn).
 Schedule::command('matches:cleanup --days=14 --prune-dasfootball')->dailyAt('03:00');
+
+// Sinh lại sitemap tĩnh sau khi cleanup xong (match/league/team mới nhất).
+Schedule::command('sitemap:generate')->dailyAt('03:30');
