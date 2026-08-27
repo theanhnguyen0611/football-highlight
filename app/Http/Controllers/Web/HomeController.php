@@ -7,6 +7,7 @@ use App\Models\League;
 use App\Models\Team;
 use App\Services\SeoService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -303,41 +304,45 @@ class HomeController extends Controller
 
     private function getLeagues(): \Illuminate\Support\Collection
     {
-        return League::withCount('matches')
-            ->orderByDesc('matches_count')
-            ->get()
-            ->map(fn($l) => [
-                'id'          => $l->id,
-                'name'        => $l->name,
-                'slug'        => $l->slug,
-                'logo_url'    => $l->logo_url,
-                'match_count' => $l->matches_count,
-            ]);
+        return Cache::remember('home.leagues', 900, function () {
+            return League::withCount('matches')
+                ->orderByDesc('matches_count')
+                ->get()
+                ->map(fn($l) => [
+                    'id'          => $l->id,
+                    'name'        => $l->name,
+                    'slug'        => $l->slug,
+                    'logo_url'    => $l->logo_url,
+                    'match_count' => $l->matches_count,
+                ]);
+        });
     }
 
     private function getPopularTeams(): \Illuminate\Support\Collection
     {
-        return Team::withCount([
-                'homeMatches as home_count',
-                'awayMatches as away_count',
-            ])
-            ->with('translations')
-            ->orderByRaw('(home_count + away_count) DESC')
-            ->limit(12)
-            ->get()
-            ->map(fn($t) => [
-                'id'          => $t->id,
-                'name'        => $t->name,
-                'slug'        => $t->slug,
-                'type'        => $t->type,
-                'logo_url'    => $t->logo_url,
-                'initials'    => $t->initials,
-                'match_count' => $t->home_count + $t->away_count,
-                'translations'=> $t->translations->map(fn($tr) => [
-                    'locale' => $tr->locale,
-                    'name'   => $tr->name,
-                ])->toArray(),
-            ]);
+        return Cache::remember('home.popular_teams', 900, function () {
+            return Team::withCount([
+                    'homeMatches as home_count',
+                    'awayMatches as away_count',
+                ])
+                ->with('translations')
+                ->orderByRaw('(home_count + away_count) DESC')
+                ->limit(12)
+                ->get()
+                ->map(fn($t) => [
+                    'id'          => $t->id,
+                    'name'        => $t->name,
+                    'slug'        => $t->slug,
+                    'type'        => $t->type,
+                    'logo_url'    => $t->logo_url,
+                    'initials'    => $t->initials,
+                    'match_count' => $t->home_count + $t->away_count,
+                    'translations'=> $t->translations->map(fn($tr) => [
+                        'locale' => $tr->locale,
+                        'name'   => $tr->name,
+                    ])->toArray(),
+                ]);
+        });
     }
 
     private function serializeRelated(FootballMatch $match): array
