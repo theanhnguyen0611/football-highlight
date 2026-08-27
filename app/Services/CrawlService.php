@@ -133,9 +133,9 @@ class CrawlService
         return $code;
     }
 
-    // ─── Find + save video records: Hoofoot + DasFootball crawl độc lập ─────
-    // Mỗi nguồn tự guard theo chính nó (đã có row pending/ready thì bỏ qua),
-    // không phụ thuộc nguồn kia — cả 2 cùng hiển thị song song trên trang xem.
+    // ─── Find + save video records: Hoofoot là nguồn chính, DasFootball là backup ─
+    // DasFootball CHỈ chạy khi không có video Hoofoot dùng được, và trận đã đá
+    // đủ 2 ngày (nhường thời gian cho Hoofoot cập nhật trước).
     // Match chỉ hiển thị khi có ít nhất 1 video ready (filter ở HomeController).
     public function findAndMapVideos(array $listings, int $limit = 100, bool $tryDasFootball = false): int
     {
@@ -198,10 +198,12 @@ class CrawlService
                 }
             }
 
-            // DasFootball tự guard theo chính nó (!$hasDasFB), không phụ thuộc
-            // Hoofoot đã có hay chưa — 2 nguồn crawl độc lập, mỗi nguồn tối đa
-            // 1 lần/trận, cả 2 cùng hiển thị song song trên trang xem.
-            if ($tryDasFootball && !$hasDasFB) {
+            // Backup: chỉ chạy khi không có video Hoofoot nào dùng được, và trận đã
+            // đá đủ 2 ngày — nhường thời gian cho Hoofoot cập nhật trước, tránh
+            // DasFootball "cướp" link trước rồi trận bị hạ ưu tiên, không thử lại
+            // Hoofoot nữa (do ORDER BY số video ASC + LIMIT ở query bên trên).
+            $matchAgeDays = $match->match_date->diffInDays(now());
+            if ($tryDasFootball && !$hoofootVideo && !$hasDasFB && $matchAgeDays >= 2) {
                 $video = $this->crawlDasFootball($match);
                 if ($video) {
                     MatchVideo::updateOrCreate(

@@ -164,7 +164,7 @@ user=www-data
 numprocs=1
 redirect_stderr=true
 stdout_logfile=${APP_DIR}/storage/logs/worker.log
-stopwaitsecs=3600
+stopwaitsecs=30
 SUP
 
 supervisorctl reread && supervisorctl update && supervisorctl start bolareel-worker:*
