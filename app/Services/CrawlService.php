@@ -16,7 +16,7 @@ class CrawlService
     // Quét sitemap + 50 trang league tốn ~1 phút, mà CrawlMatchesJob (30 phút)
     // và DasFootballJob (1 giờ) đều gọi hàm này riêng → cache lại để dùng
     // chung, đỡ tăng gấp 3 lần traffic lên Hoofoot mỗi giờ.
-    private const LISTINGS_CACHE_TTL = 3600;
+    private const LISTINGS_CACHE_TTL = 1800;
 
     // ─── Crawl sitemap → league pages → [slug => match_id] ──────
     public function crawlHoofootListings(): array
