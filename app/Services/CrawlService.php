@@ -13,9 +13,9 @@ class CrawlService
 
     private string $sitemap = 'https://hoofoot.com/matchsitemap.php';
 
-    // Quét sitemap + 50 trang league tốn ~1 phút, mà CrawlMatchesJob (30 phút)
-    // và DasFootballJob (1 giờ) đều gọi hàm này riêng → cache lại để dùng
-    // chung, đỡ tăng gấp 3 lần traffic lên Hoofoot mỗi giờ.
+    // Quét sitemap + 50 trang league tốn ~1 phút, mà CrawlMatchesJob (30p),
+    // MapHoofootVideosJob (15p) và DasFootballJob (1h) đều gọi hàm này riêng
+    // → cache lại để dùng chung, đỡ crawl lại Hoofoot mỗi lần gọi.
     private const LISTINGS_CACHE_TTL = 1800;
 
     // ─── Crawl sitemap → league pages → [slug => match_id] ──────
@@ -137,7 +137,7 @@ class CrawlService
     // DasFootball CHỈ chạy khi không có video Hoofoot dùng được, và trận đã đá
     // đủ 2 ngày (nhường thời gian cho Hoofoot cập nhật trước).
     // Match chỉ hiển thị khi có ít nhất 1 video ready (filter ở HomeController).
-    public function findAndMapVideos(array $listings, int $limit = 100, bool $tryDasFootball = false): int
+    public function findAndMapVideos(array $listings, int $limit = 100, bool $tryDasFootball = false, ?int $withinDays = null): int
     {
         if (empty($listings)) return 0;
 
@@ -160,6 +160,14 @@ class CrawlService
         $query = FootballMatch::with(['homeTeam', 'awayTeam', 'videos'])
             ->where('match_status', 'finished');
 
+        // Job "bắt sớm" chỉ cần xét trận vừa đá xong gần đây, khỏi quét lại
+        // toàn bộ backlog mỗi lần chạy (job này chạy dày hơn CrawlMatchesJob).
+        // match_date là cột DATE (không có giờ) nên chỉ lọc được theo NGÀY,
+        // không thể lọc theo giờ thực (không có dữ liệu giờ đá trong DB).
+        if ($withinDays !== null) {
+            $query->where('match_date', '>=', today()->subDays($withinDays - 1));
+        }
+
         // Nhánh Hoofoot: chỉ cần xét trận nằm trong ngày Hoofoot đã liệt kê,
         // đỡ query thừa. Nhánh DasFootball: KHÔNG lọc theo ngày Hoofoot — nó tự
         // build URL từ tên đội + ngày, không phụ thuộc listings Hoofoot. Nếu
@@ -172,7 +180,7 @@ class CrawlService
 
         $matches = $query
             ->orderByDesc('match_date')
-            ->orderByRaw("(SELECT COUNT(*) FROM match_videos WHERE match_videos.match_id = matches.id AND status IN ('pending','ready')) ASC")
+            ->orderByRaw("(SELECT COUNT(*) FROM match_videos WHERE match_videos.match_id = matches.id AND status IN ('pending','downloading','ready')) ASC")
             ->limit($limit)
             ->get();
 
@@ -181,9 +189,12 @@ class CrawlService
             $dateStr      = $match->match_date->format('Y-m-d');
             $slugsForDate = $slugsByDate[$dateStr] ?? [];
 
-            $hoofootVideo = $match->videos->where('source', 'hoofoot')->whereIn('status', ['pending', 'ready'])->first();
+            // 'downloading' PHẢI tính là "đã có" — thiếu nó thì job chạy trúng lúc
+            // DownloadVideosJob đang tải sẽ tưởng chưa có video, map lại rồi đè
+            // status về 'pending' + xoá local_path, phá video đang tải dở.
+            $hoofootVideo = $match->videos->where('source', 'hoofoot')->whereIn('status', ['pending', 'downloading', 'ready'])->first();
             $hoofootError = $match->videos->where('source', 'hoofoot')->where('status', 'error')->first();
-            $hasDasFB     = $match->videos->where('source', 'dasfootball')->whereIn('status', ['pending', 'ready'])->isNotEmpty();
+            $hasDasFB     = $match->videos->where('source', 'dasfootball')->whereIn('status', ['pending', 'downloading', 'ready'])->isNotEmpty();
 
             // Thử Hoofoot nếu chưa có row dùng được
             if (!$hoofootVideo) {
