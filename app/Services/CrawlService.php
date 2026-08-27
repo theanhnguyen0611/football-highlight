@@ -157,9 +157,20 @@ class CrawlService
         // phần lớn 0 video vì Hoofoot không phủ — nếu xếp theo "số video ASC"
         // sẽ chiếm hết $limit mỗi lượt, chặn vĩnh viễn trận vừa đá (đã có 1
         // video DasFootball) không bao giờ được thử lại Hoofoot nữa.
-        $matches = FootballMatch::with(['homeTeam', 'awayTeam', 'videos'])
-            ->where('match_status', 'finished')
-            ->whereIn(\DB::raw('DATE(match_date)'), array_keys($slugsByDate))
+        $query = FootballMatch::with(['homeTeam', 'awayTeam', 'videos'])
+            ->where('match_status', 'finished');
+
+        // Nhánh Hoofoot: chỉ cần xét trận nằm trong ngày Hoofoot đã liệt kê,
+        // đỡ query thừa. Nhánh DasFootball: KHÔNG lọc theo ngày Hoofoot — nó tự
+        // build URL từ tên đội + ngày, không phụ thuộc listings Hoofoot. Nếu
+        // vẫn lọc theo $slugsByDate thì những ngày Hoofoot không phủ (0 slug)
+        // sẽ bị loại khỏi query, khiến DasFootball không bao giờ được thử cho
+        // các trận ngày đó dù đáng lẽ nó vẫn backup được.
+        if (!$tryDasFootball) {
+            $query->whereIn(\DB::raw('DATE(match_date)'), array_keys($slugsByDate));
+        }
+
+        $matches = $query
             ->orderByDesc('match_date')
             ->orderByRaw("(SELECT COUNT(*) FROM match_videos WHERE match_videos.match_id = matches.id AND status IN ('pending','ready')) ASC")
             ->limit($limit)
@@ -342,11 +353,29 @@ class CrawlService
             "https://dasfootball.com/{$away}-vs-{$home}-{$date}/",
         ];
 
-        // DasFootball là SPA — headStatus luôn 200, phải dùng Playwright để kiểm tra nội dung
-        // Thử từng URL pattern đến khi Playwright trả về embed URL
+        // DasFootball (Next.js) server-render sẵn contentUrl trong JSON-LD
+        // VideoObject ngay trong HTML gốc → thử curl trước (rẻ, không cần
+        // Chromium). Chỉ fallback Playwright khi curl không tìm ra gì chắc
+        // chắn (trang cần JS mới lộ nguồn video).
         $scriptPath = base_path('scripts/dasfootball-embed.js');
 
         foreach ($patterns as $tryUrl) {
+            $curl = $this->getDasFootballEmbedViaCurl($tryUrl);
+
+            if ($curl['status'] === 'found') {
+                Log::info('DasFootball: nguồn tìm được (curl)', [
+                    'match' => $match->slug,
+                    'chọn'  => $curl['type'],
+                ]);
+                return ['url' => $curl['url'], 'type' => $curl['type']];
+            }
+
+            // "not found" → bỏ qua toàn bộ match luôn (không thử pattern khác)
+            if ($curl['status'] === 'not_found') {
+                return null;
+            }
+
+            // curl không chắc (rỗng/không tìm ra nguồn) → fallback Playwright
             $escapedUrl = escapeshellarg($tryUrl);
             $output     = shell_exec("node {$scriptPath} {$escapedUrl} 2>/dev/null");
             if (!$output) { usleep(500000); continue; }
@@ -355,7 +384,7 @@ class CrawlService
             if (!empty($data['embedUrl'])) {
                 // Script đã xếp hạng hls > mp4 > streamable > iframe > youtube.
                 // Log cả danh sách để biết trang có gì mà mình bỏ qua.
-                Log::info('DasFootball: nguồn tìm được', [
+                Log::info('DasFootball: nguồn tìm được (playwright)', [
                     'match'   => $match->slug,
                     'chọn'    => $data['type'] ?? 'iframe',
                     'sources' => array_map(
@@ -373,6 +402,34 @@ class CrawlService
             usleep(500000);
         }
         return null;
+    }
+
+    // DasFootball nhúng sẵn link video thật vào JSON-LD VideoObject (để SEO
+    // đọc được) ngay trong HTML gốc (server-rendered) — đọc thẳng field này
+    // thay vì quét toàn trang tìm URL. Không tìm thấy thì để crawlDasFootball()
+    // tự fallback sang Playwright (case cần chạy JS mới lộ nguồn).
+    private function getDasFootballEmbedViaCurl(string $url): array
+    {
+        $html = $this->fetch($url);
+        if (!$html) return ['status' => 'unknown'];
+
+        // DasFootball là SPA, trang không tồn tại vẫn trả HTTP 200. Không dùng
+        // str_contains 'not found' chung chung — text đó nằm sẵn trong bundle
+        // JS của route 404 (Next.js App Router gộp chung), lộ ra ở CẢ trang hợp
+        // lệ. Marker đáng tin duy nhất: thẻ <title> render server-side.
+        if (str_contains($html, '<title>Page not found</title>')) {
+            return ['status' => 'not_found'];
+        }
+
+        if (preg_match('/"contentUrl":"([^"]+)"/', $html, $m)
+            || preg_match('/"embedUrl":"([^"]+)"/', $html, $m)) {
+            $videoUrl = str_replace('\\/', '/', $m[1]);
+            $type     = str_contains($videoUrl, '.m3u8') ? 'hls' : (str_contains($videoUrl, '.mp4') ? 'mp4' : 'iframe');
+
+            return ['status' => 'found', 'url' => $videoUrl, 'type' => $type];
+        }
+
+        return ['status' => 'empty'];
     }
 
     private function fetch(string $url): ?string

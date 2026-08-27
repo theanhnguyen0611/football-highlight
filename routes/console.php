@@ -17,5 +17,7 @@ Schedule::job(new DasFootballJob)->hourly();
 // Download videos mỗi 15 phút
 Schedule::job(new DownloadVideosJob)->everyFifteenMinutes();
 
-// Dọn matches cũ > 14 ngày không có video, chạy mỗi đêm lúc 3:00 AM
-Schedule::command('matches:cleanup --days=14')->dailyAt('03:00');
+// Dọn matches cũ > 14 ngày không có video, chạy mỗi đêm lúc 3:00 AM.
+// --prune-dasfootball: xoá video DasFootball khi Hoofoot đã có video ready
+// cho cùng trận (tránh hiển thị trùng 2 highlight khi Hoofoot đến muộn).
+Schedule::command('matches:cleanup --days=14 --prune-dasfootball')->dailyAt('03:00');
