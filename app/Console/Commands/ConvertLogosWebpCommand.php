@@ -44,6 +44,14 @@ class ConvertLogosWebpCommand extends Command
             if ($apply) $team->update(['logo_path' => $newLogoPath]);
         }
 
+        // ── File tĩnh còn sót lại (vd logo pill hardcode trong AppLayout.vue, không gắn với DB) ──
+        foreach (Storage::disk('public')->allFiles('logos') as $relative) {
+            [$ok, $newRelative] = $this->convertOne($manager, $base, $relative, $apply);
+            if ($ok === null || !$ok) { if ($ok === false) $failed++; continue; }
+            $converted++;
+            $this->line("  [static] {$relative} -> {$newRelative}");
+        }
+
         $this->newLine();
         $this->info(($apply ? 'Đã convert' : 'Sẽ convert (dry-run, thêm --apply để chạy thật)') . ": {$converted}, lỗi: {$failed}");
     }
