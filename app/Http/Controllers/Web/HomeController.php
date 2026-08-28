@@ -22,6 +22,9 @@ class HomeController extends Controller
         $matches = $this->latestHighlightsQuery($featuredIds)->paginate(20)->withQueryString();
 
         view()->share('seo', app(SeoService::class)->home());
+        // Preload ảnh nền của card đầu tiên (LCP element) để browser tải song song
+        // với lúc tải JS bundle, thay vì phải đợi Vue render xong mới bắt đầu tải ảnh.
+        view()->share('preloadImage', $featured[0]['league']['background_url_full'] ?? null);
 
         return Inertia::render('Home', [
             'matches'             => $matches,

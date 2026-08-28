@@ -26,6 +26,10 @@
     @endif
     <meta name="robots" content="{{ $noindex ? 'noindex,nofollow' : 'index,follow' }}">
 
+    @if($preloadImage ?? null)
+    <link rel="preload" as="image" fetchpriority="high" href="{{ $preloadImage }}">
+    @endif
+
     {{-- Open Graph --}}
     <meta data-blade-seo property="og:site_name" content="BolaReel">
     <meta data-blade-seo property="og:type" content="{{ $ogType }}">
