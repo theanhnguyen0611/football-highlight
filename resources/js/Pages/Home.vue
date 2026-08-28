@@ -57,7 +57,7 @@
                             <div class="thumb-teams">
                                 <div class="fb-team">
                                     <div class="fb-logo">
-                                        <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                        <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" :alt="teamName(match.home_team)" />
                                         <span v-else>{{ match.home_team?.initials }}</span>
                                     </div>
                                     <span class="fb-name">{{ teamName(match.home_team) }}</span>
@@ -72,7 +72,7 @@
 
                                 <div class="fb-team">
                                     <div class="fb-logo">
-                                        <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                        <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" :alt="teamName(match.away_team)" />
                                         <span v-else>{{ match.away_team?.initials }}</span>
                                     </div>
                                     <span class="fb-name">{{ teamName(match.away_team) }}</span>
@@ -132,7 +132,7 @@
                         <div class="thumb-teams">
                             <div class="fb-team">
                                 <div class="fb-logo">
-                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" :alt="teamName(match.home_team)" />
                                     <span v-else>{{ match.home_team?.initials }}</span>
                                 </div>
                                 <span class="fb-name">{{ teamName(match.home_team) }}</span>
@@ -147,7 +147,7 @@
 
                             <div class="fb-team">
                                 <div class="fb-logo">
-                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" :alt="teamName(match.away_team)" />
                                     <span v-else>{{ match.away_team?.initials }}</span>
                                 </div>
                                 <span class="fb-name">{{ teamName(match.away_team) }}</span>

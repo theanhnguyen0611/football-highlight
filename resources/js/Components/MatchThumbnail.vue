@@ -15,7 +15,7 @@
         <div class="thumb-teams">
             <div class="thumb-team">
                 <div class="thumb-logo">
-                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" style="width:100%;height:100%;object-fit:contain;padding:8px" />
+                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" style="width:100%;height:100%;object-fit:contain;padding:8px" :alt="teamName(match.home_team)" />
                     <span v-else class="thumb-initials">{{ match.home_team?.initials }}</span>
                 </div>
                 <span class="thumb-name">{{ teamName(match.home_team) }}</span>
@@ -25,7 +25,7 @@
 
             <div class="thumb-team">
                 <div class="thumb-logo">
-                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" style="width:100%;height:100%;object-fit:contain;padding:8px" />
+                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" style="width:100%;height:100%;object-fit:contain;padding:8px" :alt="teamName(match.away_team)" />
                     <span v-else class="thumb-initials">{{ match.away_team?.initials }}</span>
                 </div>
                 <span class="thumb-name">{{ teamName(match.away_team) }}</span>

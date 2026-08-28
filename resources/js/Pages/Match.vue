@@ -35,12 +35,12 @@
                         <div v-if="!hasVideo" class="player-placeholder">
                             <div class="ph-teams">
                                 <div class="ph-logo">
-                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" :alt="teamName(match.home_team)" />
                                     <span v-else>{{ match.home_team?.initials }}</span>
                                 </div>
                                 <span class="ph-vs">VS</span>
                                 <div class="ph-logo">
-                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" :alt="teamName(match.away_team)" />
                                     <span v-else>{{ match.away_team?.initials }}</span>
                                 </div>
                             </div>
@@ -55,12 +55,12 @@
                         <div v-if="hasVideo && !hasStarted" class="player-placeholder">
                             <div class="ph-teams">
                                 <div class="ph-logo">
-                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" :alt="teamName(match.home_team)" />
                                     <span v-else>{{ match.home_team?.initials }}</span>
                                 </div>
                                 <span class="ph-vs">VS</span>
                                 <div class="ph-logo">
-                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" :alt="teamName(match.away_team)" />
                                     <span v-else>{{ match.away_team?.initials }}</span>
                                 </div>
                             </div>
@@ -124,12 +124,12 @@
                     <div class="info-card">
                         <div class="info-top">
                             <Link v-if="match.league?.slug" class="info-league" :href="localePath(`/league/${match.league.slug}`)">
-                                <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-logo" />
+                                <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-logo" :alt="leagueName(match.league)" />
                                 <span class="lg-name">{{ leagueName(match.league) }}</span>
                                 <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
                             </Link>
                             <div v-else class="info-league">
-                                <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-logo" />
+                                <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-logo" :alt="leagueName(match.league)" />
                                 <span class="lg-name">{{ leagueName(match.league) }}</span>
                                 <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
                             </div>
@@ -141,7 +141,7 @@
                         <div class="teams-row">
                             <Link class="team-col" :href="localePath(`/team/${match.home_team?.slug}`)">
                                 <div class="team-logo">
-                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" :alt="teamName(match.home_team)" />
                                     <span v-else>{{ match.home_team?.initials }}</span>
                                 </div>
                                 <span class="team-name">{{ teamName(match.home_team) }}</span>
@@ -165,7 +165,7 @@
 
                             <Link class="team-col" :href="localePath(`/team/${match.away_team?.slug}`)">
                                 <div class="team-logo">
-                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" :alt="teamName(match.away_team)" />
                                     <span v-else>{{ match.away_team?.initials }}</span>
                                 </div>
                                 <span class="team-name">{{ teamName(match.away_team) }}</span>
@@ -307,12 +307,12 @@
                             <div class="rel-thumb" :style="relatedBg(m)">
                                 <div class="rel-teams">
                                     <div class="rel-logo">
-                                        <img v-if="m.home_team?.logo_url" :src="m.home_team.logo_url" />
+                                        <img v-if="m.home_team?.logo_url" :src="m.home_team.logo_url" :alt="teamName(m.home_team)" />
                                         <span v-else>{{ m.home_team?.initials }}</span>
                                     </div>
                                     <span class="rel-vs">vs</span>
                                     <div class="rel-logo">
-                                        <img v-if="m.away_team?.logo_url" :src="m.away_team.logo_url" />
+                                        <img v-if="m.away_team?.logo_url" :src="m.away_team.logo_url" :alt="teamName(m.away_team)" />
                                         <span v-else>{{ m.away_team?.initials }}</span>
                                     </div>
                                 </div>

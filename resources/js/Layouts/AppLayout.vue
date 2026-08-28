@@ -5,7 +5,7 @@
         <header class="topbar">
             <div class="topbar-inner">
                 <div class="topbar-left">
-                    <button class="action-btn" @click.stop="showMegaMenu = !showMegaMenu">
+                    <button class="action-btn" :aria-label="t('nav.menu')" @click.stop="showMegaMenu = !showMegaMenu">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                     </button>
                     <button class="action-btn" :class="{ active: showScore }" @click="toggleScore" :title="showScore ? t('match.hide_score') : t('match.show_score')">
@@ -23,7 +23,7 @@
                                 @focus="searchFocused = true; showSuggestions = true"
                                 @blur="searchFocused = false; setTimeout(() => showSuggestions = false, 200)"
                                 @keyup.enter="search" />
-                            <button class="search-btn" @click="search">
+                            <button class="search-btn" :aria-label="t('nav.search')" @click="search">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             </button>
                         </div>
@@ -36,7 +36,7 @@
                             </Link>
                         </div>
                     </div>
-                    <button class="action-btn mobile-search-trigger" @click="showMobileSearch = true">
+                    <button class="action-btn mobile-search-trigger" :aria-label="t('nav.search')" @click="showMobileSearch = true">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     </button>
                     <div class="lang-wrap" @click.stop="showLangMenu = !showLangMenu">
@@ -116,7 +116,7 @@
                         <div class="drawer-label">{{ t('nav.popular_teams') }}</div>
                         <Link v-for="team in popularTeams.slice(0,12)" :key="team.id" :href="localePath(`/team/${team.slug}`)" class="drawer-item" @click="showMegaMenu = false">
                             <div class="drawer-avatar">
-                                <img v-if="team.logo_url" :src="team.logo_url" />
+                                <img v-if="team.logo_url" :src="team.logo_url" :alt="teamName(team)" />
                                 <span v-else>{{ team.initials }}</span>
                             </div>
                             <span>{{ teamName(team) }}</span>

@@ -76,7 +76,7 @@
                         <div class="thumb-teams">
                             <div class="fb-team">
                                 <div class="fb-logo" :class="{ highlighted: match.home_team?.id === team.id }">
-                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" />
+                                    <img v-if="match.home_team?.logo_url" :src="match.home_team.logo_url" :alt="teamName(match.home_team)" />
                                     <span v-else>{{ match.home_team?.initials }}</span>
                                 </div>
                                 <span class="fb-name">{{ teamName(match.home_team) }}</span>
@@ -91,7 +91,7 @@
 
                             <div class="fb-team">
                                 <div class="fb-logo" :class="{ highlighted: match.away_team?.id === team.id }">
-                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" />
+                                    <img v-if="match.away_team?.logo_url" :src="match.away_team.logo_url" :alt="teamName(match.away_team)" />
                                     <span v-else>{{ match.away_team?.initials }}</span>
                                 </div>
                                 <span class="fb-name">{{ teamName(match.away_team) }}</span>
@@ -101,7 +101,7 @@
 
                     <div class="card-info">
                         <div class="card-league">
-                            <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-icon" />
+                            <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-icon" :alt="match.league?.name" />
                             <span class="lg-name-text">{{ match.league?.name }}</span>
                         </div>
                         <div class="card-teams-row">
