@@ -474,7 +474,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .footer-col { display: flex; flex-direction: column; gap: 2px; }
 
 .footer-col-title {
-    font-size: 10px; font-weight: 700; color: #e01552;
+    font-size: 10px; font-weight: 700; color: #ff3366;
     text-transform: uppercase; letter-spacing: .8px;
     margin-bottom: 10px;
     padding-bottom: 8px;
