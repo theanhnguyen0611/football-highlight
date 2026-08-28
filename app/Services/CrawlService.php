@@ -210,11 +210,21 @@ class CrawlService
                     if ($embedUrl && !$sameFailedUrl) {
                         // Giữ lại kết quả để bên dưới biết Hoofoot đã có — thiếu dòng
                         // gán này thì DasFootball chạy cả khi Hoofoot vừa map xong.
-                        $hoofootVideo = MatchVideo::updateOrCreate(
-                            ['match_id' => $match->id, 'source' => 'hoofoot'],
-                            ['source_url' => $sourceUrl, 'embed_url' => $embedUrl, 'local_path' => null, 'status' => 'pending']
-                        );
-                        $mapped++;
+                        //
+                        // Từ 27/08 có 2 queue worker chạy song song — CrawlMatchesJob
+                        // và MapHoofootVideosJob có thể cùng map 1 trận cùng lúc.
+                        // updateOrCreate() không atomic (firstOrNew rồi save), race hiếm
+                        // vẫn có thể đụng unique index (match_id, source) → bắt lỗi thay
+                        // vì để crash cả vòng lặp, worker kia đã lo xong row này rồi.
+                        try {
+                            $hoofootVideo = MatchVideo::updateOrCreate(
+                                ['match_id' => $match->id, 'source' => 'hoofoot'],
+                                ['source_url' => $sourceUrl, 'embed_url' => $embedUrl, 'local_path' => null, 'status' => 'pending']
+                            );
+                            $mapped++;
+                        } catch (\Illuminate\Database\QueryException $e) {
+                            Log::info('findAndMapVideos: race khi tạo hoofoot video, worker khác đã xử lý', ['match_id' => $match->id]);
+                        }
                     }
                     usleep(500_000);
                 }
@@ -228,11 +238,15 @@ class CrawlService
             if ($tryDasFootball && !$hoofootVideo && !$hasDasFB && $matchAgeDays >= 2) {
                 $video = $this->crawlDasFootball($match);
                 if ($video) {
-                    MatchVideo::updateOrCreate(
-                        ['match_id' => $match->id, 'source' => 'dasfootball'],
-                        ['video_type' => 'highlight', 'embed_url' => $video['url'], 'source_url' => $video['url'], 'status' => 'pending']
-                    );
-                    $mapped++;
+                    try {
+                        MatchVideo::updateOrCreate(
+                            ['match_id' => $match->id, 'source' => 'dasfootball'],
+                            ['video_type' => 'highlight', 'embed_url' => $video['url'], 'source_url' => $video['url'], 'status' => 'pending']
+                        );
+                        $mapped++;
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        Log::info('findAndMapVideos: race khi tạo dasfootball video, worker khác đã xử lý', ['match_id' => $match->id]);
+                    }
                 }
                 usleep(500_000);
             }
