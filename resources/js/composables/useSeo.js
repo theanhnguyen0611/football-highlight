@@ -347,8 +347,9 @@ export function useSeo(locale = 'en') {
             },
         }
         if (image) jsonLd.thumbnailUrl = image
-        if (video?.embed_url) jsonLd.embedUrl = video.embed_url
-        else if (video?.source_url) jsonLd.contentUrl = video.source_url
+        // Không lộ link nguồn (Hoofoot/DasFootball) ra JSON-LD — luôn trỏ
+        // embedUrl về trang embed của mình, đồng bộ với SeoService.php.
+        jsonLd.embedUrl = getOrigin() + `/embed/match/${match.slug}`
         if (video?.duration_seconds) jsonLd.duration = `PT${Math.round(video.duration_seconds)}S`
         jsonLd.isFamilyFriendly = true
         jsonLd.inLanguage = HTML_LANG[loc.value] || 'en'

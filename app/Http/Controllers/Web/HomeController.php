@@ -255,7 +255,14 @@ class HomeController extends Controller
                     'id'               => $v->id,
                     'status'           => $v->status,
                     'video_type'       => $v->video_type,
-                    'stream_url'       => $v->stream_url,
+                    // Không dùng $v->stream_url trực tiếp — accessor đó
+                    // fallback về embed_url/source_url (link Hoofoot/
+                    // DasFootball) khi chưa tự host xong. Trang embed này
+                    // được nhúng công khai, JSON props nằm ngay trong
+                    // HTML source, không được lộ link nguồn.
+                    'stream_url'       => $v->status === 'ready'
+                        ? route('api.videos.stream', $v->id)
+                        : null,
                     'quality'          => $v->quality,
                     'language'         => $v->language,
                     'duration_seconds' => $v->duration_seconds,

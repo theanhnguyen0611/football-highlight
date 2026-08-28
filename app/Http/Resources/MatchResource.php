@@ -60,7 +60,12 @@ class MatchResource extends JsonResource
             'videos'       => $this->videos->map(fn($v) => [
                 'id'         => $v->id,
                 'source'     => $v->source,
-                'stream_url' => $v->stream_url,
+                // Không dùng $v->stream_url trực tiếp — accessor đó fallback
+                // về embed_url/source_url (link Hoofoot/DasFootball) khi
+                // chưa tự host xong. API này public, phải ẩn link nguồn.
+                'stream_url' => $v->status === 'ready'
+                    ? route('api.videos.stream', $v->id)
+                    : null,
                 'status'     => $v->status,
                 'language'   => $v->language,
             ])->toArray(),
