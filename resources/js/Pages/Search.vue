@@ -168,7 +168,7 @@
                                         <span class="badge-league">{{ leagueName(match.league) }}</span>
                                         <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
                                     </div>
-                                    <span class="meta-date">{{ formatDate(match.match_date) }}</span>
+                                    <span class="meta-date">{{ formatDate(match.match_date, match.kick_off_time) }}</span>
                                 </div>
                             </div>
                         </Link>

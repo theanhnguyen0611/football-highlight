@@ -431,6 +431,11 @@ class HighlightlyService
             }
             $league = $this->upsertLeague($leagueData);
             $date   = substr($m['date'], 0, 10);
+            // $m['date'] là datetime đầy đủ dạng "2026-08-27T23:10:00.000Z" (UTC) —
+            // match_date chỉ giữ phần NGÀY để lọc theo ngày ở nhiều chỗ khác nhau
+            // (sitemap, cleanup, MapHoofootVideosJob...), kick_off_time giữ phần GIỜ
+            // riêng để hiển thị "x giờ trước" chính xác thay vì tính từ nửa đêm.
+            $kickOffTime = strpos($m['date'], 'T') !== false ? substr($m['date'], 11, 8) : null;
             $slug   = Str::slug("{$homeTeam->slug}-vs-{$awayTeam->slug}-{$date}");
 
             return FootballMatch::updateOrCreate(
@@ -443,6 +448,7 @@ class HighlightlyService
                     'home_score'     => $this->parseScore($m, 'home'),
                     'away_score'     => $this->parseScore($m, 'away'),
                     'match_date'     => $date,
+                    'kick_off_time'  => $kickOffTime,
                     'round'          => $m['round'] ?? null,
                     'match_status'   => $this->mapStatus($m['state']['description'] ?? null),
                     'highlightly_id' => $m['id'],

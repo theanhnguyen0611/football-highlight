@@ -1028,9 +1028,14 @@ export function useLocale(locale = 'en') {
         return leagueTranslations[slug]?.[loc.value] ?? name
     }
 
-    function formatDate(date) {
+    function formatDate(date, kickOffTime) {
         if (!date) return ''
-        const d = new Date(date)
+        // kickOffTime (kick_off_time, dạng "HH:mm:ss" UTC) là giờ đá thật lấy từ
+        // Highlightly — ghép vào để tính "x giờ trước" chính xác, thay vì luôn tính
+        // từ nửa đêm của match_date (khiến trận vừa đá xong bị ghi nhầm "yesterday"
+        // ngay khi vừa qua nửa đêm). Match cũ/nguồn khác không có giờ thì vẫn fallback
+        // về match_date như cũ.
+        const d = kickOffTime ? new Date(`${String(date).slice(0, 10)}T${kickOffTime}Z`) : new Date(date)
         const diffMs = Date.now() - d
         const diffMins = Math.floor(diffMs / 60000)
         const diffHours = Math.floor(diffMs / 3600000)

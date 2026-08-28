@@ -123,13 +123,18 @@
                     <!-- Match Info Card -->
                     <div class="info-card">
                         <div class="info-top">
-                            <div class="info-league">
+                            <Link v-if="match.league?.slug" class="info-league" :href="localePath(`/league/${match.league.slug}`)">
+                                <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-logo" />
+                                <span class="lg-name">{{ leagueName(match.league) }}</span>
+                                <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
+                            </Link>
+                            <div v-else class="info-league">
                                 <img v-if="match.league?.logo_url" :src="match.league.logo_url" class="lg-logo" />
                                 <span class="lg-name">{{ leagueName(match.league) }}</span>
                                 <span v-if="match.round" class="badge-round">{{ formatRound(match.round) }}</span>
                             </div>
                             <div class="info-date">
-                                <span>{{ formatDate(match.match_date) }}</span>
+                                <span>{{ formatDate(match.match_date, match.kick_off_time) }}</span>
                             </div>
                         </div>
 
@@ -314,7 +319,7 @@
                             </div>
                             <div class="rel-info">
                                 <p class="rel-title">{{ teamName(m.home_team) }} vs {{ teamName(m.away_team) }}</p>
-                                <span class="rel-date">{{ formatDate(m.match_date) }}</span>
+                                <span class="rel-date">{{ formatDate(m.match_date, m.kick_off_time) }}</span>
                             </div>
                         </Link>
                     </div>
