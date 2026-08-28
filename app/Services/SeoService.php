@@ -402,13 +402,10 @@ class SeoService
         // Use our own embed page for Google Video rich results
         $ld['embedUrl'] = $this->appUrl . "/embed/match/{$match->slug}";
 
-        // Chỉ set contentUrl khi video đã tự host xong (CDN riêng) — không lộ
-        // link nguồn (Hoofoot/DasFootball) ra ngoài. contentUrl không bắt buộc
-        // theo schema.org, thà bỏ trống còn hơn trỏ ra domain ngoài.
+        // Không set contentUrl: đây là link CDN trực tiếp (m3u8), lộ ra là bị
+        // hotlink/tải thẳng. contentUrl không bắt buộc theo schema.org —
+        // embedUrl ở trên (trỏ về trang embed của mình) đã đủ cho rich results.
         $video = $match->videos?->first();
-        if ($video?->local_path) {
-            $ld['contentUrl'] = $video->stream_url;
-        }
         if ($video?->duration_seconds) {
             $ld['duration'] = 'PT' . (int) $video->duration_seconds . 'S';
         }
