@@ -30,6 +30,9 @@
     <link rel="preload" as="image" fetchpriority="high" href="{{ $preloadImage }}">
     @endif
 
+    {{-- Preload CSS bundle để browser tải sớm song song, giảm render-blocking delay --}}
+    <link rel="preload" as="style" fetchpriority="high" href="{{ \Illuminate\Support\Facades\Vite::asset('resources/css/app.css') }}">
+
     {{-- Open Graph --}}
     <meta data-blade-seo property="og:site_name" content="BolaReel">
     <meta data-blade-seo property="og:type" content="{{ $ogType }}">
