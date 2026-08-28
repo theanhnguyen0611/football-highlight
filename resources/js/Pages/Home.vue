@@ -27,6 +27,11 @@
     >
         <div class="home-wrap">
 
+            <!-- H1 ẩn cho SEO: trang chủ dùng h2 cho các section, nhưng cần
+                 đúng 1 h1 mô tả chủ đề trang. Ẩn bằng sr-only để không đổi
+                 giao diện — nội dung y hệt <title> đã localize sẵn. -->
+            <h1 class="sr-only">{{ seo.title }}</h1>
+
             <!-- Featured Highlights -->
             <div v-if="featured_highlights.length" class="featured-section">
                 <div class="section-head">

@@ -25,6 +25,12 @@
         :locale="locale"
     >
         <div class="match-wrap">
+
+            <!-- H1 ẩn cho SEO: tên đội hiển thị bằng span trong layout tỉ số,
+                 không đổi cấu trúc/CSS đó. seo.title đã localize đầy đủ theo
+                 từng trận (đội, tỉ số, giải, vòng đấu, ngày giờ). -->
+            <h1 class="sr-only">{{ seo.title }}</h1>
+
             <div class="match-layout">
 
                 <!-- MAIN COLUMN -->

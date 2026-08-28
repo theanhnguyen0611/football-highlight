@@ -21,6 +21,9 @@
     >
         <div class="home-wrap">
 
+            <!-- H1 ẩn cho SEO, xem giải thích trong Home.vue -->
+            <h1 class="sr-only">{{ seo.title }}</h1>
+
             <div class="section-head">
                 <div class="section-head-left">
                     <span class="section-icon">

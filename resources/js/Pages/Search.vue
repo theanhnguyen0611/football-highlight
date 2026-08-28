@@ -22,6 +22,9 @@
     >
         <div class="search-wrap">
 
+            <!-- H1 ẩn cho SEO, xem giải thích trong Home.vue -->
+            <h1 class="sr-only">{{ seo.title }}</h1>
+
             <!-- Header -->
             <div class="search-header">
                 <div class="search-header-inner">
