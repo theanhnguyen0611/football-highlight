@@ -26,9 +26,9 @@
     @endif
     <meta name="robots" content="{{ $noindex ? 'noindex,nofollow' : 'index,follow' }}">
 
-    @if($preloadImage ?? null)
-    <link rel="preload" as="image" fetchpriority="high" href="{{ $preloadImage }}">
-    @endif
+    @foreach($preloadImages ?? [] as $img)
+    <link rel="preload" as="image" fetchpriority="high" href="{{ $img }}">
+    @endforeach
 
     {{-- Preload CSS bundle để browser tải sớm song song, giảm render-blocking delay --}}
     <link rel="preload" as="style" fetchpriority="high" href="{{ \Illuminate\Support\Facades\Vite::asset('resources/css/app.css') }}">
