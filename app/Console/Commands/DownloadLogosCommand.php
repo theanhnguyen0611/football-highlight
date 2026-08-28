@@ -5,11 +5,13 @@ namespace App\Console\Commands;
 use App\Models\League;
 use App\Models\Team;
 use Illuminate\Console\Command;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 
 class DownloadLogosCommand extends Command
 {
     protected $signature   = 'logos:download';
-    protected $description = 'Download team/league logos từ Highlightly về SX65, update DB';
+    protected $description = 'Download team/league logos từ Highlightly về SX65, convert sang WebP, update DB';
 
     public function handle(): void
     {
@@ -26,8 +28,7 @@ class DownloadLogosCommand extends Command
         $bar = $this->output->createProgressBar($teams->count());
 
         foreach ($teams as $team) {
-            $ext  = $this->ext($team->logo_path);
-            $file = "teams/{$team->id}{$ext}";
+            $file = "teams/{$team->id}.webp";
             $path = "{$localBase}/{$file}";
 
             if ($this->download($team->logo_path, $path)) {
@@ -47,8 +48,7 @@ class DownloadLogosCommand extends Command
         $bar = $this->output->createProgressBar($leagues->count());
 
         foreach ($leagues as $league) {
-            $ext  = $this->ext($league->logo_path);
-            $file = "leagues/{$league->id}{$ext}";
+            $file = "leagues/{$league->id}.webp";
             $path = "{$localBase}/{$file}";
 
             if ($this->download($league->logo_path, $path)) {
@@ -71,14 +71,16 @@ class DownloadLogosCommand extends Command
         ]));
 
         if (!$data) return false;
-        file_put_contents($path, $data);
-        return filesize($path) > 0;
-    }
 
-    private function ext(string $url): string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-        $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        return $ext ? ".{$ext}" : '.png';
+        try {
+            $manager = new ImageManager(Driver::class);
+            $encoded = $manager->decodeBinary($data)->encodeUsingFileExtension('webp', quality: 85);
+            file_put_contents($path, (string) $encoded);
+        } catch (\Throwable $e) {
+            // Nguồn không phải ảnh raster (vd SVG) — lưu tạm nguyên bản để không mất logo
+            file_put_contents($path, $data);
+        }
+
+        return filesize($path) > 0;
     }
 }
