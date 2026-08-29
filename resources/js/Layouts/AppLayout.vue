@@ -234,7 +234,7 @@ const navLeagues = [
     { slug: 'uefa-europa-league',    name: 'Europa League',    abbr: 'UEL', logo: '/storage/logos/leagues/uefa-europa-league.webp',    dark: true },
     { slug: 'dfb-pokal',             name: 'DFB Pokal',        abbr: 'DFB', logo: '/storage/logos/leagues/dfb-pokal.webp' },
     { slug: 'super-lig',             name: 'Süper Lig',        abbr: 'SL',  logo: '/storage/logos/leagues/super-lig.webp' },
-    { slug: 'national-league',       name: 'National League',  abbr: 'NL',  logo: '/storage/logos/leagues/championship.webp' },
+    { slug: 'national-league',       name: 'National League',  abbr: 'NL',  logo: '/storage/logos/leagues/national-league.webp' },
     { slug: 'friendlies-clubs',      name: 'Club Friendlies',  abbr: 'CLB', logo: '/storage/logos/leagues/friendlies.webp' },
     { slug: 'friendlies',            name: 'International Friendlies', abbr: 'INT', logo: '/storage/logos/leagues/friendlies.webp', dark: true },
 ]
