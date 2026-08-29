@@ -75,6 +75,7 @@
                         <!-- Click overlay: toggle play/pause -->
                         <div v-if="hasVideo" class="player-click-area"
                             @click="onVideoClick"
+                            @dblclick="onVideoDblClick"
                             @mousemove="onOverlayMouseMove"
                             @mouseleave="onOverlayMouseLeave"
                         >
@@ -570,6 +571,12 @@ function onVideoClick() {
     clearTimeout(flashTimer)
     flashVisible.value = true
     flashTimer = setTimeout(() => { flashVisible.value = false }, 600)
+}
+
+// Đúp chuột: vào/thoát fullscreen. click đơn (toggle play) vẫn bắn trước đó —
+// bấm đúp 2 lần liền nên play/pause tự triệt tiêu nhau, không lệch trạng thái.
+function onVideoDblClick() {
+    plyrInstance?.fullscreen?.toggle()
 }
 
 // ── Events ─────────────────────────────────────────
