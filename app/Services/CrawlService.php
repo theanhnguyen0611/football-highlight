@@ -66,15 +66,18 @@ class CrawlService
     // ─── Lấy embed URL từ hoofoot match page ─────────────────────
     // Thử curl trước (hoofoot server-side renders iframe src),
     // chỉ fallback sang Playwright nếu cần vượt Cloudflare.
-    public function getEmbedUrl(string $sourceUrl): ?string
+    // hasExtended: trang đã có tab "EXTENDED" (bản dài) hay chưa — Hoofoot
+    // đôi khi publish bản ngắn trước, vài giờ sau mới thêm bản EXTENDED.
+    /** @return array{embedUrl: ?string, hasExtended: bool} */
+    public function getEmbedUrl(string $sourceUrl): array
     {
-        $embedUrl = $this->getEmbedUrlViaCurl($sourceUrl)
-            ?? $this->getEmbedUrlViaPlaywright($sourceUrl);
-
-        return $embedUrl;
+        return $this->getEmbedUrlViaCurl($sourceUrl)
+            ?? $this->getEmbedUrlViaPlaywright($sourceUrl)
+            ?? ['embedUrl' => null, 'hasExtended' => false];
     }
 
-    private function getEmbedUrlViaCurl(string $sourceUrl): ?string
+    /** @return array{embedUrl: string, hasExtended: bool}|null */
+    private function getEmbedUrlViaCurl(string $sourceUrl): ?array
     {
         $html = $this->fetch($sourceUrl);
         if (!$html) return null;
@@ -100,14 +103,15 @@ class CrawlService
                     return null;
                 }
 
-                return $url;
+                return ['embedUrl' => $url, 'hasExtended' => $this->hasExtendedTab($html)];
             }
         }
 
         return null;
     }
 
-    private function getEmbedUrlViaPlaywright(string $sourceUrl): ?string
+    /** @return array{embedUrl: string, hasExtended: bool}|null */
+    private function getEmbedUrlViaPlaywright(string $sourceUrl): ?array
     {
         $scriptPath = base_path('scripts/hoofoot-embed.js');
         $url        = escapeshellarg($sourceUrl);
@@ -115,7 +119,18 @@ class CrawlService
         if (!$output) return null;
 
         $data = json_decode(trim($output), true);
-        return $data['embedUrl'] ?? null;
+        if (empty($data['embedUrl'])) return null;
+
+        return ['embedUrl' => $data['embedUrl'], 'hasExtended' => (bool) ($data['hasExtended'] ?? false)];
+    }
+
+    // Tab "EXTENDED" (bản dài) nằm trong khối #descruta của trang match —
+    // check quanh đó thay vì toàn HTML để tránh trùng chữ "EXTENDED" ở chỗ khác.
+    private function hasExtendedTab(string $html): bool
+    {
+        $pos = strpos($html, 'descruta');
+        if ($pos === false) return false;
+        return str_contains(substr($html, $pos, 800), 'EXTENDED');
     }
 
     private function headStatus(string $url): int
@@ -192,41 +207,67 @@ class CrawlService
             // 'downloading' PHẢI tính là "đã có" — thiếu nó thì job chạy trúng lúc
             // DownloadVideosJob đang tải sẽ tưởng chưa có video, map lại rồi đè
             // status về 'pending' + xoá local_path, phá video đang tải dở.
-            $hoofootVideo = $match->videos->where('source', 'hoofoot')->whereIn('status', ['pending', 'downloading', 'ready'])->first();
-            $hoofootError = $match->videos->where('source', 'hoofoot')->where('status', 'error')->first();
-            $hasDasFB     = $match->videos->where('source', 'dasfootball')->whereIn('status', ['pending', 'downloading', 'ready'])->isNotEmpty();
+            $hoofootVideo   = $match->videos->where('source', 'hoofoot')->whereIn('status', ['pending', 'downloading', 'ready'])->first();
+            // Hoofoot mới publish bản ngắn, chưa có tab EXTENDED — chờ tối đa 24h
+            // (xem hasExtendedTab()) trước khi chốt lấy tạm bản ngắn.
+            $hoofootWaiting = $match->videos->where('source', 'hoofoot')->where('status', 'awaiting_extended')->first();
+            $hoofootError   = $match->videos->where('source', 'hoofoot')->where('status', 'error')->first();
+            $hasDasFB       = $match->videos->where('source', 'dasfootball')->whereIn('status', ['pending', 'downloading', 'ready'])->isNotEmpty();
 
             // Thử Hoofoot nếu chưa có row dùng được
             if (!$hoofootVideo) {
-                $hoofootSlug = $this->findMatchingSlug($match, $slugsForDate);
-                if ($hoofootSlug) {
-                    $sourceUrl = "{$this->hoofoot}/?match={$hoofootSlug}";
-                    $embedUrl  = $this->getEmbedUrl($sourceUrl);
-
-                    // Lần trước tải hỏng mà embed_url không đổi → tải lại cũng hỏng y
-                    // hệt. Giữ nguyên 'error' và nhường luôn cho DasFootball.
-                    $sameFailedUrl = $hoofootError && $hoofootError->embed_url === $embedUrl;
-
-                    if ($embedUrl && !$sameFailedUrl) {
-                        // Giữ lại kết quả để bên dưới biết Hoofoot đã có — thiếu dòng
-                        // gán này thì DasFootball chạy cả khi Hoofoot vừa map xong.
-                        //
-                        // Từ 27/08 có 2 queue worker chạy song song — CrawlMatchesJob
-                        // và MapHoofootVideosJob có thể cùng map 1 trận cùng lúc.
-                        // updateOrCreate() không atomic (firstOrNew rồi save), race hiếm
-                        // vẫn có thể đụng unique index (match_id, source) → bắt lỗi thay
-                        // vì để crash cả vòng lặp, worker kia đã lo xong row này rồi.
-                        try {
-                            $hoofootVideo = MatchVideo::updateOrCreate(
-                                ['match_id' => $match->id, 'source' => 'hoofoot'],
-                                ['source_url' => $sourceUrl, 'embed_url' => $embedUrl, 'local_path' => null, 'status' => 'pending']
-                            );
+                if ($hoofootWaiting) {
+                    // Đang chờ bản EXTENDED — check lại đúng URL cũ, không tìm slug lại.
+                    $result = $this->getEmbedUrl($hoofootWaiting->source_url);
+                    if ($result['embedUrl']) {
+                        $expired = $hoofootWaiting->created_at->lt(now()->subHours(24));
+                        if ($result['hasExtended'] || $expired) {
+                            // Có bản EXTENDED, hoặc hết hạn chờ → chốt (hết hạn thì
+                            // đành lấy tạm bản ngắn hiện có, không chờ nữa).
+                            $hoofootWaiting->update(['embed_url' => $result['embedUrl'], 'status' => 'pending']);
                             $mapped++;
-                        } catch (\Illuminate\Database\QueryException $e) {
-                            Log::info('findAndMapVideos: race khi tạo hoofoot video, worker khác đã xử lý', ['match_id' => $match->id]);
                         }
                     }
+                    // Dù chốt hay chưa, coi như Hoofoot "đã có" round này — không để
+                    // DasFootball cướp trong lúc đang chờ EXTENDED.
+                    $hoofootVideo = $hoofootWaiting;
                     usleep(500_000);
+                } else {
+                    $hoofootSlug = $this->findMatchingSlug($match, $slugsForDate);
+                    if ($hoofootSlug) {
+                        $sourceUrl = "{$this->hoofoot}/?match={$hoofootSlug}";
+                        $result    = $this->getEmbedUrl($sourceUrl);
+                        $embedUrl  = $result['embedUrl'];
+
+                        // Lần trước tải hỏng mà embed_url không đổi → tải lại cũng hỏng y
+                        // hệt. Giữ nguyên 'error' và nhường luôn cho DasFootball.
+                        $sameFailedUrl = $hoofootError && $hoofootError->embed_url === $embedUrl;
+
+                        if ($embedUrl && !$sameFailedUrl) {
+                            // Chưa có tab EXTENDED → để 'awaiting_extended', chưa cho
+                            // tải, chờ tối đa 24h thay vì tải luôn bản ngắn.
+                            $status = $result['hasExtended'] ? 'pending' : 'awaiting_extended';
+
+                            // Giữ lại kết quả để bên dưới biết Hoofoot đã có — thiếu dòng
+                            // gán này thì DasFootball chạy cả khi Hoofoot vừa map xong.
+                            //
+                            // Từ 27/08 có 2 queue worker chạy song song — CrawlMatchesJob
+                            // và MapHoofootVideosJob có thể cùng map 1 trận cùng lúc.
+                            // updateOrCreate() không atomic (firstOrNew rồi save), race hiếm
+                            // vẫn có thể đụng unique index (match_id, source) → bắt lỗi thay
+                            // vì để crash cả vòng lặp, worker kia đã lo xong row này rồi.
+                            try {
+                                $hoofootVideo = MatchVideo::updateOrCreate(
+                                    ['match_id' => $match->id, 'source' => 'hoofoot'],
+                                    ['source_url' => $sourceUrl, 'embed_url' => $embedUrl, 'local_path' => null, 'status' => $status]
+                                );
+                                $mapped++;
+                            } catch (\Illuminate\Database\QueryException $e) {
+                                Log::info('findAndMapVideos: race khi tạo hoofoot video, worker khác đã xử lý', ['match_id' => $match->id]);
+                            }
+                        }
+                        usleep(500_000);
+                    }
                 }
             }
 
