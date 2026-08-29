@@ -299,7 +299,9 @@ export function useSeo(locale = 'en') {
         const ctxJa = [league, round].filter(Boolean).join('、')
         const when  = [date, time].filter(Boolean).join(' ')
 
-        const hasScore = match.home_score != null && match.away_score != null
+        // Ẩn tỉ số khỏi title/description trong 7 ngày đầu (tránh spoil kết
+        // quả trên kết quả tìm kiếm Google) — chỉ hiện lại sau đó.
+        const hasScore = match.home_score != null && match.away_score != null && matchAgeInDays(match.match_date) >= 7
         const scoreStr = hasScore ? `${match.home_score}–${match.away_score}` : null
 
         const hl = MATCH_HIGHLIGHTS[loc.value] || MATCH_HIGHLIGHTS.en

@@ -250,7 +250,10 @@ class SeoService
         $time   = $match->kick_off_time
             ? substr((string) $match->kick_off_time, 0, 5) : '';
 
-        $hasScore  = isset($match->home_score) && isset($match->away_score);
+        // Ẩn tỉ số khỏi title/description trong 7 ngày đầu (tránh spoil kết
+        // quả trên kết quả tìm kiếm Google) — chỉ hiện lại sau đó.
+        $ageInDays = $match->match_date ? Carbon::parse($match->match_date)->diffInDays(now()) : 0;
+        $hasScore  = isset($match->home_score) && isset($match->away_score) && $ageInDays >= 7;
         $scoreStr  = $hasScore ? "{$match->home_score}–{$match->away_score}" : null;
 
         $hl  = self::MATCH_HIGHLIGHTS[$this->locale] ?? self::MATCH_HIGHLIGHTS['en'];

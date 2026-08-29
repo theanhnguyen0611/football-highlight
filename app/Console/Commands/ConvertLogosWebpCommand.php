@@ -60,10 +60,23 @@ class ConvertLogosWebpCommand extends Command
     private function convertOne(ImageManager $manager, string $base, string $relative, bool $apply): array
     {
         $ext = strtolower(pathinfo($relative, PATHINFO_EXTENSION));
-        if (!in_array($ext, ['png', 'jpg', 'jpeg'])) return [null, $relative];
-
         $fullPath = "{$base}/{$relative}";
-        if (!file_exists($fullPath)) return [false, $relative];
+
+        // DB ghi .webp nhưng file thật lại là .png/.jpg (vd bị gán path thủ
+        // công trước khi convert thật sự chạy) — vẫn phải tìm & convert,
+        // không được bỏ qua chỉ vì đuôi trong DB đã là webp.
+        if ($ext === 'webp') {
+            if (file_exists($fullPath)) return [null, $relative];
+            foreach (['png', 'jpg', 'jpeg'] as $altExt) {
+                $altPath = preg_replace('/\.webp$/i', ".{$altExt}", $fullPath);
+                if (file_exists($altPath)) { $fullPath = $altPath; break; }
+            }
+            if (!file_exists($fullPath)) return [false, $relative];
+        } elseif (!in_array($ext, ['png', 'jpg', 'jpeg'])) {
+            return [null, $relative];
+        } elseif (!file_exists($fullPath)) {
+            return [false, $relative];
+        }
 
         $newRelative = preg_replace('/\.(png|jpe?g)$/i', '.webp', $relative);
         $newFullPath = "{$base}/{$newRelative}";
