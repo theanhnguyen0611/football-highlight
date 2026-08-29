@@ -402,6 +402,33 @@ class DownloadService
         Log::info('syncToStorage done', ['video_id' => $video->id, 'path' => $relDir]);
     }
 
+    // BunnyCDN cache 30 ngày (cache-control: max-age=2592000). Khi ghi đè video
+    // đã từng sync trước đó (vd: hoofoot:fix-short-videos reset lại bản EXTENDED),
+    // origin đổi nhưng edge CDN khác không tự biết — phải purge thủ công, không
+    // thì user ở edge chưa refresh vẫn thấy bản cũ dù origin đã đúng.
+    public function purgeCdnCache(): void
+    {
+        $apiKey = config('services.cdn.api_key');
+        $zoneId = config('services.cdn.pullzone_id');
+        if (!$apiKey || !$zoneId) {
+            Log::warning('purgeCdnCache bỏ qua: thiếu BUNNY_API_KEY/BUNNY_PULLZONE_ID');
+            return;
+        }
+
+        $cmd = sprintf(
+            'curl -s -o /dev/null -w "%%{http_code}" -X POST -H %s "https://api.bunny.net/pullzone/%s/purgeCache"',
+            escapeshellarg("AccessKey: {$apiKey}"),
+            $zoneId
+        );
+        $code = trim((string) shell_exec($cmd));
+
+        if ($code !== '204') {
+            Log::error('purgeCdnCache thất bại', ['http_code' => $code]);
+        } else {
+            Log::info('purgeCdnCache thành công');
+        }
+    }
+
     // Xoá một thư mục trên SX65. Video nằm trên CX23 rồi mới rsync sang, nên khi
     // dọn phải xoá cả hai nơi — bản local có thể còn nếu rsync trước đó thất bại.
     public function deleteFromStorage(string $relDir): bool
@@ -551,7 +578,7 @@ class DownloadService
 
     // Download 1 video rồi đẩy lên storage. Thất bại thì đánh dấu 'error' —
     // findAndMapVideos() dựa vào status này để biết khi nào thử nguồn fallback.
-    private function downloadOne(MatchVideo $video): bool
+    public function downloadOne(MatchVideo $video): bool
     {
         $url = $video->embed_url;
         $video->markDownloading();
