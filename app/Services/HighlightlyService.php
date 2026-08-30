@@ -20,6 +20,7 @@ class HighlightlyService
         19506, 75672, 80778, 173537,
         216087, 34824,
         262041, // Saudi Pro League
+        115669, // Serie A (Ý) — Highlightly đổi id giữa mùa, 61205 giờ trỏ sang Brazil
 
         // World Cup Qualifiers (tất cả châu lục gộp chung)
         25463, 26314, 27165, 28016, 28867, 29718, 32271,
@@ -29,9 +30,12 @@ class HighlightlyService
     private const WCQ_LOGO = 'https://highlightly.net/soccer/images/leagues/28016.png';
 
     // Highlightly đặt tên chung chung "Pro League" cho nhiều nước (Bỉ, Iran, Ả
-    // Rập...) không phân biệt được — đè tên rõ ràng theo id đã biết.
+    // Rập...) không phân biệt được — đè tên rõ ràng theo id đã biết. Cũng dùng
+    // để tách các giải trùng tên (61205 = Brazil, nhưng Highlightly đặt tên
+    // "Serie A" giống hệt Ý id=115669 → trùng slug "serie-a" nếu không override).
     private const LEAGUE_NAME_OVERRIDES = [
         262041 => 'Saudi Pro League',
+        61205  => 'Brasileirão',
     ];
 
     // Các league ID được gộp thành 1 league ảo trong DB
@@ -490,19 +494,31 @@ class HighlightlyService
         return 'other';
     }
 
+    // Khớp theo highlightly_id trước; không thấy thì fallback theo slug (giống
+    // upsertLeague()) — tránh đụng slug unique với team đã tồn tại nhưng chưa
+    // có highlightly_id (tạo từ nguồn khác), khiến insert lỗi và match bị bỏ qua.
     private function upsertTeam(?array $t): ?Team
     {
         if (!$t) return null;
-        return Team::updateOrCreate(
-            ['highlightly_id' => $t['id']],
-            [
-                'name'           => $t['name'],
-                'slug'           => Str::slug($t['name']),
-                'type'           => Team::guessTypePublic($t['name']),
-                'logo_path'      => $t['logo'] ?? null,
-                'highlightly_id' => $t['id'],
-            ]
-        );
+
+        $slug = Str::slug($t['name']);
+        $team = Team::where('highlightly_id', $t['id'])->first()
+            ?? Team::where('slug', $slug)->first();
+
+        $data = [
+            'name'           => $t['name'],
+            'slug'           => $slug,
+            'type'           => Team::guessTypePublic($t['name']),
+            'logo_path'      => $t['logo'] ?? null,
+            'highlightly_id' => $t['id'],
+        ];
+
+        if ($team) {
+            $team->update($data);
+            return $team;
+        }
+
+        return Team::create($data);
     }
 
     private function upsertLeague(?array $l): ?League
@@ -521,8 +537,13 @@ class HighlightlyService
         }
 
         if ($league) {
+            // Cập nhật cả slug theo tên mới — thiếu dòng này thì league bị đổi tên
+            // qua LEAGUE_NAME_OVERRIDES (vd tách "Serie A" Ý/Brazil) vẫn giữ slug
+            // cũ, khiến lần sync sau tên trùng khác lại "giành" nhầm record này
+            // qua fallback theo slug ở trên.
             $league->update([
                 'name'           => $name,
+                'slug'           => Str::slug($name),
                 'logo_path'      => $l['logo'] ?? null,
                 'highlightly_id' => $l['id'],
             ]);
