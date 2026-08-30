@@ -713,6 +713,11 @@ a { text-decoration: none; color: inherit; }
 }
 @media (max-width: 1000px) { .match-layout { grid-template-columns: 1fr; } }
 
+/* Grid item mặc định không co dưới kích thước nội dung con (min-width: auto) —
+   không có dòng này, donuts-row rộng cố định sẽ đẩy cả cột content tràn viewport
+   trên mobile thay vì bị co lại/wrap đúng cách. */
+.main-col { min-width: 0; }
+
 /* ── Player ── */
 .player-wrap {
     position: relative;
@@ -967,11 +972,12 @@ a { text-decoration: none; color: inherit; }
 
 /* Top donuts row */
 .donuts-row {
-    display: flex; justify-content: space-around; align-items: flex-start;
-    padding: 24px 12px 12px; gap: 8px;
+    display: flex; flex-wrap: wrap; justify-content: space-around; align-items: flex-start;
+    padding: 24px 12px 12px; gap: 8px 4px;
 }
 .donut-item {
-    display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    flex: 1 1 96px;
 }
 .donut-vals {
     display: flex; align-items: center; gap: 10px;
