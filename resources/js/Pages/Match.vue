@@ -267,20 +267,6 @@
                                 </span>
                             </div>
 
-                            <!-- Top 3 donuts -->
-                            <div class="donuts-row">
-                                <div v-for="d in topDonuts" :key="d.key" class="donut-item">
-                                    <div class="donut-vals">
-                                        <span class="donut-val home" :class="{ winner: d.homePct > 50 }">{{ d.home }}</span>
-                                        <div class="donut-ring" :style="{
-                                            background: `conic-gradient(from 180deg, #e01552 0% ${Math.max(2, Math.min(98, d.homePct))}%, #3b82f6 ${Math.max(2, Math.min(98, d.homePct))}% 100%)`
-                                        }"><div class="donut-hole"></div></div>
-                                        <span class="donut-val away" :class="{ winner: d.homePct < 50 }">{{ d.away }}</span>
-                                    </div>
-                                    <div class="donut-label">{{ d.label }}</div>
-                                </div>
-                            </div>
-
                             <!-- Grouped stats -->
                             <div v-for="group in statsGroups" :key="group.label" class="stat-group">
                                 <div class="stat-group-label">{{ group.label }}</div>
@@ -374,7 +360,7 @@ let plyrInstance = null
 let hlsInstance  = null
 
 const STAT_GROUPS = [
-    { labelKey: 'stats.key',        keys: ['Expected Goals', 'Big Chances Created'] },
+    { labelKey: 'stats.key',        keys: ['Possession', 'Expected Goals', 'Big Chances Created'] },
     { labelKey: 'stats.attack',     keys: ['Shots on target', 'Shots off target', 'Blocked shots', 'Corners', 'Shots within penalty area'] },
     { labelKey: 'stats.passes',     keys: ['Total passes', 'Successful passes', 'Key Passes'] },
     { labelKey: 'stats.defence',    keys: ['Successful Tackles', 'Interceptions', 'Clearances', 'Goalkeeper saves'] },
@@ -382,6 +368,7 @@ const STAT_GROUPS = [
 ]
 
 const STAT_NAME_KEYS = {
+    'Possession':                  'ui.ball_possession',
     'Expected Goals':              'stat.expected_goals',
     'Big Chances Created':         'stat.big_chances_created',
     'Shots on target':             'stat.shots_on_target',
@@ -417,36 +404,6 @@ const statsData = computed(() => {
     return { home: toMap(homeData?.statistics), away: toMap(awayData?.statistics) }
 })
 
-const homePossession = computed(() =>
-    Math.round((statsData.value?.home['Possession'] ?? 0.5) * 100)
-)
-const awayPossession = computed(() => 100 - homePossession.value)
-
-const topDonuts = computed(() => {
-    if (!statsData.value) return []
-    const { home, away } = statsData.value
-    const result = []
-
-    const xgH = home['Expected Goals'], xgA = away['Expected Goals']
-    if (xgH != null || xgA != null) {
-        const h = xgH ?? 0, a = xgA ?? 0
-        const pct = Math.round((h / (h + a || 1)) * 100)
-        result.push({ key: 'xg', label: t('stat.expected_goals'), home: parseFloat(h.toFixed(2)), away: parseFloat(a.toFixed(2)), homePct: pct })
-    }
-
-    const hPct = homePossession.value
-    result.push({ key: 'poss', label: t('ui.ball_possession'), home: `${hPct}%`, away: `${awayPossession.value}%`, homePct: hPct })
-
-    const sotH = home['Shots on target'], sotA = away['Shots on target']
-    if (sotH != null || sotA != null) {
-        const h = sotH ?? 0, a = sotA ?? 0
-        const pct = Math.round((h / (h + a || 1)) * 100)
-        result.push({ key: 'sot', label: t('stat.shots_on_target'), home: h, away: a, homePct: pct })
-    }
-
-    return result
-})
-
 const statsGroups = computed(() => {
     if (!statsData.value) return []
     const { home, away } = statsData.value
@@ -457,17 +414,19 @@ const statsGroups = computed(() => {
         rows: group.keys.map(key => {
             const h = home[key] ?? 0
             const a = away[key] ?? 0
+            if (h === 0 && a === 0) return null
             const total = h + a || 1
+            const isPossession = key === 'Possession'
             return {
                 name: STAT_NAME_KEYS[key] ? t(STAT_NAME_KEYS[key]) : key,
-                home: fmt(h),
-                away: fmt(a),
+                home: isPossession ? `${Math.round(h * 100)}%` : fmt(h),
+                away: isPossession ? `${Math.round(a * 100)}%` : fmt(a),
                 homePct: (h / total) * 100,
                 awayPct: (a / total) * 100,
                 homeWins: h > a,
                 awayWins: a > h,
             }
-        }).filter(r => r.home > 0 || r.away > 0)
+        }).filter(Boolean)
     })).filter(g => g.rows.length)
 })
 
@@ -969,45 +928,6 @@ a { text-decoration: none; color: inherit; }
 }
 .home-dot { background: #e01552; }
 .away-dot { background: #3b82f6; }
-
-/* Top donuts row */
-.donuts-row {
-    display: flex; flex-wrap: wrap; justify-content: space-around; align-items: flex-start;
-    padding: 24px 12px 12px; gap: 8px 4px;
-}
-.donut-item {
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
-    flex: 1 1 96px;
-}
-.donut-vals {
-    display: flex; align-items: center; gap: 10px;
-}
-.donut-val {
-    font-size: 16px; font-weight: 800; min-width: 38px; text-align: center;
-}
-.donut-val.home { color: #b03550; }
-.donut-val.home.winner { color: #e01552; }
-.donut-val.away { color: #4070b8; }
-.donut-val.away.winner { color: #3b82f6; }
-.donut-ring {
-    width: 72px; height: 72px; border-radius: 50%;
-    position: relative; flex-shrink: 0;
-}
-.donut-hole {
-    position: absolute; inset: 13px;
-    border-radius: 50%; background: #16161e;
-}
-.donut-label {
-    font-size: 9px; font-weight: 700;
-    color: #a0a0bc; letter-spacing: 0.12em;
-    text-transform: uppercase; text-align: center;
-}
-@media (max-width: 480px) {
-    .donut-ring { width: 58px; height: 58px; }
-    .donut-hole { inset: 10px; }
-    .donut-val { font-size: 14px; min-width: 28px; }
-    .donut-label { font-size: 8px; }
-}
 
 /* Stat groups */
 .stat-group { border-top: 1px solid #1c1c28; }
