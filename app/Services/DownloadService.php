@@ -22,6 +22,12 @@ class DownloadService
         if (preg_match('/https?:\/\/[^\s"\'\\\\]+\.m3u8[^\s"\'\\\\]*/', $result, $m)) {
             return $m[0];
         }
+        // Player mới của videas.fr (script#data-embed) không còn biến "hls: '...'"
+        // mà nhúng JSON với link MP4 trực tiếp trong "src" — thiếu pattern này thì
+        // bị coi là "no playable source" dù video vẫn phát bình thường.
+        if (preg_match('/"src"\s*:\s*"(https?:\/\/[^"]+\.mp4[^"]*)"/', $result, $m)) {
+            return $m[1];
+        }
         return null;
     }
 
@@ -596,9 +602,9 @@ class DownloadService
             str_contains($url, 'streamable.com')
         ) {
             $ok = $this->downloadYoutube($video, $url);
-        } elseif ($hlsUrl = $this->getHlsUrl($url)) {
-            // Trang embed kiểu videas.fr — HLS nằm trong HTML
-            $ok = $this->downloadHls($video, $hlsUrl);
+        } elseif ($playUrl = $this->getHlsUrl($url)) {
+            // Trang embed kiểu videas.fr — HLS hoặc MP4 trực tiếp nằm trong HTML/JSON
+            $ok = $this->isMp4Url($playUrl) ? $this->downloadMp4($video, $playUrl) : $this->downloadHls($video, $playUrl);
         } else {
             Log::warning("downloadAllPending: no playable source for video {$video->id}: {$url}");
             $video->markError();
