@@ -293,27 +293,32 @@ class HomeController extends Controller
 
     private function getFeaturedHighlights(): array
     {
-        $teamSlugs = [
-            // Clubs
-            'real-madrid', 'barcelona', 'manchester-city', 'liverpool', 'manchester-united',
-            'arsenal', 'chelsea', 'bayern-munich', 'paris-saint-germain',
-            'juventus', 'ac-milan', 'inter', 'napoli', 'borussia-dortmund',
-            'atletico-madrid', 'tottenham',
-            // National teams
-            'argentina', 'france', 'spain', 'germany', 'england', 'brazil', 'portugal',
-        ];
+        // Cache 5 phút — query này chạy trên mỗi request trang chủ, có nhiều
+        // eager load (translations/league/videos) nên khá tốn, trong khi dữ
+        // liệu (trận 7 ngày gần nhất của các đội lớn) không đổi liên tục.
+        return Cache::remember('home.featured_highlights', 300, function () {
+            $teamSlugs = [
+                // Clubs
+                'real-madrid', 'barcelona', 'manchester-city', 'liverpool', 'manchester-united',
+                'arsenal', 'chelsea', 'bayern-munich', 'paris-saint-germain',
+                'juventus', 'ac-milan', 'inter', 'napoli', 'borussia-dortmund',
+                'atletico-madrid', 'tottenham',
+                // National teams
+                'argentina', 'france', 'spain', 'germany', 'england', 'brazil', 'portugal',
+            ];
 
-        return FootballMatch::with(['homeTeam.translations', 'awayTeam.translations', 'league', 'videos'])
-            ->where('match_date', '>=', now()->subDays(7))
-            ->whereHas('videos', fn($v) => $v->where('status', 'ready'))
-            ->where(function ($q) use ($teamSlugs) {
-                $q->whereHas('homeTeam', fn($t) => $t->whereIn('slug', $teamSlugs))
-                  ->orWhereHas('awayTeam', fn($t) => $t->whereIn('slug', $teamSlugs));
-            })
-            ->orderBy('match_date', 'desc')
-            ->get()
-            ->map(fn($m) => $this->serializeRelated($m))
-            ->toArray();
+            return FootballMatch::with(['homeTeam.translations', 'awayTeam.translations', 'league', 'videos'])
+                ->where('match_date', '>=', now()->subDays(7))
+                ->whereHas('videos', fn($v) => $v->where('status', 'ready'))
+                ->where(function ($q) use ($teamSlugs) {
+                    $q->whereHas('homeTeam', fn($t) => $t->whereIn('slug', $teamSlugs))
+                      ->orWhereHas('awayTeam', fn($t) => $t->whereIn('slug', $teamSlugs));
+                })
+                ->orderBy('match_date', 'desc')
+                ->get()
+                ->map(fn($m) => $this->serializeRelated($m))
+                ->toArray();
+        });
     }
 
     private function getLeagues(): \Illuminate\Support\Collection
@@ -368,7 +373,11 @@ class HomeController extends Controller
         return [
             'id'            => $match->id,
             'slug'          => $match->slug,
-            'match_date'    => $match->match_date,
+            // Ép về string (thay vì object Carbon) — dữ liệu này có thể bị
+            // cache (getFeaturedHighlights), unserialize từ cache sẽ ra
+            // __PHP_Incomplete_Class__ vì Carbon không nằm trong whitelist
+            // serializable_classes, làm hỏng ngày hiển thị trên frontend.
+            'match_date'    => $match->match_date?->toJSON(),
             'kick_off_time' => $match->kick_off_time,
             'thumbnail_url' => $match->thumbnail_url,
             'home_score'    => $match->home_score,
