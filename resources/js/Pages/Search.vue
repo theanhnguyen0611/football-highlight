@@ -398,6 +398,20 @@ a { text-decoration: none; color: inherit; }
     .fb-logo { width: 50px; height: 50px; }
     .fb-logo img { width: 34px; height: 34px; }
     .fb-name { display: none; }
+
+    /* Tách score badge khỏi luồng chiều cao của .fb-middle — nếu không,
+       badge nằm dưới chữ VS mà không có gì cân đối phía trên khiến cả
+       khối bị coi là "đã canh giữa" (đúng theo toán học) nhưng mắt nhìn
+       thấy chữ VS lệch lên trên so với tâm 2 logo. */
+    .fb-middle { position: relative; }
+    .fb-score {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-top: 4px;
+        white-space: nowrap;
+    }
 }
 .fb-middle { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 .fb-vs { font-size: 15px; font-weight: 800; color: #fff; opacity: 0.9; text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
