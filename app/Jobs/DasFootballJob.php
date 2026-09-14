@@ -26,8 +26,11 @@ class DasFootballJob implements ShouldQueue, ShouldBeUnique
     {
         Log::info('DasFootballJob: start');
 
+        // DasFootball giờ là nguồn chính, được thử ở mọi job gọi
+        // findAndMapVideos() rồi (CrawlMatchesJob 30p, MapHoofootVideosJob 15p)
+        // — job này giờ chủ yếu chạy thêm 1 lượt Hoofoot fallback mỗi giờ.
         $listings = $crawl->crawlHoofootListings();
-        $mapped   = $crawl->findAndMapVideos($listings, limit: 40, tryDasFootball: true);
+        $mapped   = $crawl->findAndMapVideos($listings, limit: 40, tryHoofootFallback: true);
 
         Log::info('DasFootballJob: done', ['mapped' => $mapped]);
     }

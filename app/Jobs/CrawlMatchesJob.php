@@ -48,12 +48,15 @@ class CrawlMatchesJob implements ShouldQueue, ShouldBeUnique
             Log::warning('CrawlMatchesJob: bỏ qua Highlightly, ' . $e->getMessage());
         }
 
-        // Hoofoot: dùng full listings (bao gồm league pages)
+        // Hoofoot: dùng full listings (bao gồm league pages) — chỉ dùng cho
+        // nhánh fallback bên trong findAndMapVideos(), DasFootball (chính)
+        // không cần listings.
         $listings = $crawl->crawlHoofootListings();
         Log::info('CrawlMatchesJob: listings', ['count' => count($listings)]);
 
-        // DasFootball chạy riêng trong DasFootballJob — không gọi ở đây
-        $mapped = $crawl->findAndMapVideos($listings, limit: 60, tryDasFootball: false);
+        // DasFootball luôn được thử trước; Hoofoot chỉ chạy như fallback sau
+        // 2 ngày nếu DasFootball vẫn chưa có (xem findAndMapVideos()).
+        $mapped = $crawl->findAndMapVideos($listings, limit: 60, tryHoofootFallback: true);
 
         // Thumbnail lưu trên web server, không đẩy sang SX65 — ảnh nhỏ, nginx
         // serve trực tiếp rẻ hơn đi vòng qua CDN.

@@ -17,7 +17,7 @@ class CleanupMatchesCommand extends Command
 
     protected $signature = 'matches:cleanup
                             {--days=14 : Delete matches older than this many days with no ready video}
-                            {--prune-dasfootball : Remove DasFootball records on matches that already have a ready Hoofoot video}
+                            {--prune-hoofoot : Remove Hoofoot records on matches that already have a ready DasFootball video}
                             {--dry-run : Preview what would be deleted without actually deleting}';
 
     protected $description = 'Delete old matches that have no ready video, and remove their local files';
@@ -32,8 +32,8 @@ class CleanupMatchesCommand extends Command
             $this->warn('[DRY RUN] No changes will be made.');
         }
 
-        if ($this->option('prune-dasfootball')) {
-            $this->pruneDasFootball($dryRun);
+        if ($this->option('prune-hoofoot')) {
+            $this->pruneHoofoot($dryRun);
         }
 
         // Lọc bằng SQL chứ không ->get()->filter(): sau backfill lịch sử, bảng
@@ -79,20 +79,21 @@ class CleanupMatchesCommand extends Command
         $this->comment('Teams và leagues KHÔNG bị xoá — dữ liệu backfill được giữ nguyên.');
     }
 
-    private function pruneDasFootball(bool $dryRun): void
+    private function pruneHoofoot(bool $dryRun): void
     {
-        // Match IDs that have at least one Hoofoot video with status=ready
-        $hoofootMatchIds = MatchVideo::where('source', 'hoofoot')
+        // Match IDs that have at least one DasFootball video with status=ready
+        // (DasFootball là nguồn chính từ giờ — xem findAndMapVideos())
+        $dasFbMatchIds = MatchVideo::where('source', 'dasfootball')
             ->where('status', 'ready')
             ->pluck('match_id')
             ->unique();
 
-        // DasFootball records on those same matches
-        $toDelete = MatchVideo::where('source', 'dasfootball')
-            ->whereIn('match_id', $hoofootMatchIds)
+        // Hoofoot records on those same matches
+        $toDelete = MatchVideo::where('source', 'hoofoot')
+            ->whereIn('match_id', $dasFbMatchIds)
             ->get();
 
-        $this->info("Found {$toDelete->count()} DasFootball record(s) superseded by Hoofoot.");
+        $this->info("Found {$toDelete->count()} Hoofoot record(s) superseded by DasFootball.");
 
         if ($toDelete->isEmpty()) {
             return;
@@ -103,12 +104,12 @@ class CleanupMatchesCommand extends Command
         }
 
         if (!$dryRun) {
-            MatchVideo::where('source', 'dasfootball')
-                ->whereIn('match_id', $hoofootMatchIds)
+            MatchVideo::where('source', 'hoofoot')
+                ->whereIn('match_id', $dasFbMatchIds)
                 ->delete();
-            $this->info("Deleted {$toDelete->count()} DasFootball record(s).");
+            $this->info("Deleted {$toDelete->count()} Hoofoot record(s).");
         } else {
-            $this->warn("Would delete {$toDelete->count()} DasFootball record(s) (use without --dry-run to apply).");
+            $this->warn("Would delete {$toDelete->count()} Hoofoot record(s) (use without --dry-run to apply).");
         }
     }
 

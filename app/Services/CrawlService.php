@@ -148,14 +148,13 @@ class CrawlService
         return $code;
     }
 
-    // ─── Find + save video records: Hoofoot là nguồn chính, DasFootball là backup ─
-    // DasFootball CHỈ chạy khi không có video Hoofoot dùng được, và trận đã đá
-    // đủ 2 ngày (nhường thời gian cho Hoofoot cập nhật trước).
+    // ─── Find + save video records: DasFootball là nguồn chính, Hoofoot là backup ─
+    // DasFootball được thử ngay khi trận vừa đá xong (không chờ). Hoofoot CHỈ
+    // chạy khi DasFootball vẫn chưa có video dùng được, và trận đã đá đủ 2
+    // ngày (nhường thời gian cho DasFootball cập nhật trước).
     // Match chỉ hiển thị khi có ít nhất 1 video ready (filter ở HomeController).
-    public function findAndMapVideos(array $listings, int $limit = 100, bool $tryDasFootball = false, ?int $withinDays = null): int
+    public function findAndMapVideos(array $listings, int $limit = 100, bool $tryHoofootFallback = false, ?int $withinDays = null): int
     {
-        if (empty($listings)) return 0;
-
         $slugsByDate = [];
         foreach ($listings as $slug => $_) {
             $parts   = explode('_', $slug);
@@ -165,13 +164,11 @@ class CrawlService
             }
         }
 
-        if (empty($slugsByDate)) return 0;
-
-        // Ưu tiên trận MỚI trước (match_date DESC): sitemap Hoofoot trải dài
-        // 2024→nay, không giới hạn ngày, nên hàng nghìn trận cũ từ backfill —
-        // phần lớn 0 video vì Hoofoot không phủ — nếu xếp theo "số video ASC"
-        // sẽ chiếm hết $limit mỗi lượt, chặn vĩnh viễn trận vừa đá (đã có 1
-        // video DasFootball) không bao giờ được thử lại Hoofoot nữa.
+        // Ưu tiên trận MỚI trước (match_date DESC): DasFootball chạy cho mọi
+        // trận vừa đá xong không giới hạn ngày, nên hàng nghìn trận cũ từ
+        // backfill — phần lớn 0 video — nếu xếp theo "số video ASC" sẽ chiếm
+        // hết $limit mỗi lượt, chặn vĩnh viễn trận vừa đá không bao giờ được
+        // thử.
         $query = FootballMatch::with(['homeTeam', 'awayTeam', 'videos'])
             ->where('match_status', 'finished');
 
@@ -183,16 +180,11 @@ class CrawlService
             $query->where('match_date', '>=', today()->subDays($withinDays - 1));
         }
 
-        // Nhánh Hoofoot: chỉ cần xét trận nằm trong ngày Hoofoot đã liệt kê,
-        // đỡ query thừa. Nhánh DasFootball: KHÔNG lọc theo ngày Hoofoot — nó tự
-        // build URL từ tên đội + ngày, không phụ thuộc listings Hoofoot. Nếu
-        // vẫn lọc theo $slugsByDate thì những ngày Hoofoot không phủ (0 slug)
-        // sẽ bị loại khỏi query, khiến DasFootball không bao giờ được thử cho
-        // các trận ngày đó dù đáng lẽ nó vẫn backup được.
-        if (!$tryDasFootball) {
-            $query->whereIn(\DB::raw('DATE(match_date)'), array_keys($slugsByDate));
-        }
-
+        // KHÔNG lọc theo ngày Hoofoot đã liệt kê ở đây — DasFootball (nguồn
+        // chính, luôn được thử) tự build URL từ tên đội + ngày, không phụ
+        // thuộc listings Hoofoot. Lọc theo $slugsByDate sẽ loại khỏi query
+        // những ngày Hoofoot không phủ, khiến DasFootball không bao giờ được
+        // thử cho các trận ngày đó dù đáng lẽ vẫn chạy được bình thường.
         $matches = $query
             ->orderByDesc('match_date')
             ->orderByRaw("(SELECT COUNT(*) FROM match_videos WHERE match_videos.match_id = matches.id AND status IN ('pending','downloading','ready')) ASC")
@@ -214,8 +206,33 @@ class CrawlService
             $hoofootError   = $match->videos->where('source', 'hoofoot')->where('status', 'error')->first();
             $hasDasFB       = $match->videos->where('source', 'dasfootball')->whereIn('status', ['pending', 'downloading', 'ready'])->isNotEmpty();
 
-            // Thử Hoofoot nếu chưa có row dùng được
-            if (!$hoofootVideo) {
+            // Chính: thử DasFootball ngay khi chưa có row dùng được — không chờ,
+            // không giới hạn tuổi trận (trận vừa đá xong cũng thử luôn).
+            if (!$hasDasFB) {
+                $video = $this->crawlDasFootball($match);
+                if ($video) {
+                    try {
+                        MatchVideo::updateOrCreate(
+                            ['match_id' => $match->id, 'source' => 'dasfootball'],
+                            ['video_type' => 'highlight', 'embed_url' => $video['url'], 'source_url' => $video['url'], 'status' => 'pending']
+                        );
+                        $mapped++;
+                        $hasDasFB = true;
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        Log::info('findAndMapVideos: race khi tạo dasfootball video, worker khác đã xử lý', ['match_id' => $match->id]);
+                        $hasDasFB = true;
+                    }
+                }
+                usleep(500_000);
+            }
+
+            // Fallback: chỉ chạy khi DasFootball vẫn chưa có video dùng được, và
+            // trận đã đá đủ 2 ngày — nhường thời gian cho DasFootball cập nhật
+            // trước, tránh Hoofoot "cướp" link trước rồi trận bị hạ ưu tiên,
+            // không thử lại DasFootball nữa (do ORDER BY số video ASC + LIMIT ở
+            // query bên trên).
+            $matchAgeDays = $match->match_date->diffInDays(now());
+            if ($tryHoofootFallback && !$hasDasFB && !$hoofootVideo && $matchAgeDays >= 2) {
                 if ($hoofootWaiting) {
                     // Đang chờ bản EXTENDED — check lại đúng URL cũ, không tìm slug lại.
                     $result = $this->getEmbedUrl($hoofootWaiting->source_url);
@@ -228,9 +245,6 @@ class CrawlService
                             $mapped++;
                         }
                     }
-                    // Dù chốt hay chưa, coi như Hoofoot "đã có" round này — không để
-                    // DasFootball cướp trong lúc đang chờ EXTENDED.
-                    $hoofootVideo = $hoofootWaiting;
                     usleep(500_000);
                 } else {
                     $hoofootSlug = $this->findMatchingSlug($match, $slugsForDate);
@@ -240,7 +254,7 @@ class CrawlService
                         $embedUrl  = $result['embedUrl'];
 
                         // Lần trước tải hỏng mà embed_url không đổi → tải lại cũng hỏng y
-                        // hệt. Giữ nguyên 'error' và nhường luôn cho DasFootball.
+                        // hệt, bỏ qua.
                         $sameFailedUrl = $hoofootError && $hoofootError->embed_url === $embedUrl;
 
                         if ($embedUrl && !$sameFailedUrl) {
@@ -248,16 +262,13 @@ class CrawlService
                             // tải, chờ tối đa 24h thay vì tải luôn bản ngắn.
                             $status = $result['hasExtended'] ? 'pending' : 'awaiting_extended';
 
-                            // Giữ lại kết quả để bên dưới biết Hoofoot đã có — thiếu dòng
-                            // gán này thì DasFootball chạy cả khi Hoofoot vừa map xong.
-                            //
-                            // Từ 27/08 có 2 queue worker chạy song song — CrawlMatchesJob
-                            // và MapHoofootVideosJob có thể cùng map 1 trận cùng lúc.
-                            // updateOrCreate() không atomic (firstOrNew rồi save), race hiếm
-                            // vẫn có thể đụng unique index (match_id, source) → bắt lỗi thay
-                            // vì để crash cả vòng lặp, worker kia đã lo xong row này rồi.
+                            // Từ 27/08 có 2 queue worker chạy song song, có thể cùng map
+                            // 1 trận cùng lúc. updateOrCreate() không atomic (firstOrNew
+                            // rồi save), race hiếm vẫn có thể đụng unique index
+                            // (match_id, source) → bắt lỗi thay vì để crash cả vòng lặp,
+                            // worker kia đã lo xong row này rồi.
                             try {
-                                $hoofootVideo = MatchVideo::updateOrCreate(
+                                MatchVideo::updateOrCreate(
                                     ['match_id' => $match->id, 'source' => 'hoofoot'],
                                     ['source_url' => $sourceUrl, 'embed_url' => $embedUrl, 'local_path' => null, 'status' => $status]
                                 );
@@ -269,27 +280,6 @@ class CrawlService
                         usleep(500_000);
                     }
                 }
-            }
-
-            // Backup: chỉ chạy khi không có video Hoofoot nào dùng được, và trận đã
-            // đá đủ 2 ngày — nhường thời gian cho Hoofoot cập nhật trước, tránh
-            // DasFootball "cướp" link trước rồi trận bị hạ ưu tiên, không thử lại
-            // Hoofoot nữa (do ORDER BY số video ASC + LIMIT ở query bên trên).
-            $matchAgeDays = $match->match_date->diffInDays(now());
-            if ($tryDasFootball && !$hoofootVideo && !$hasDasFB && $matchAgeDays >= 2) {
-                $video = $this->crawlDasFootball($match);
-                if ($video) {
-                    try {
-                        MatchVideo::updateOrCreate(
-                            ['match_id' => $match->id, 'source' => 'dasfootball'],
-                            ['video_type' => 'highlight', 'embed_url' => $video['url'], 'source_url' => $video['url'], 'status' => 'pending']
-                        );
-                        $mapped++;
-                    } catch (\Illuminate\Database\QueryException $e) {
-                        Log::info('findAndMapVideos: race khi tạo dasfootball video, worker khác đã xử lý', ['match_id' => $match->id]);
-                    }
-                }
-                usleep(500_000);
             }
         }
 
@@ -436,9 +426,14 @@ class CrawlService
                 return ['url' => $curl['url'], 'type' => $curl['type']];
             }
 
-            // "not found" → bỏ qua toàn bộ match luôn (không thử pattern khác)
+            // "not found" cho URL NÀY → thử pattern khác, không có nghĩa cả trận
+            // không tồn tại trên DasFootball. Đã xác nhận thật: trận Coventry vs
+            // Hull City 29/08 CÓ trên DasFootball (đúng ở pattern home-vs-away-
+            // highlights), nhưng 3/6 pattern khác (đảo thứ tự, đổi định dạng slug)
+            // đều trả "Page not found" cho CHÍNH trận đó — not_found chỉ chứng tỏ
+            // slug đoán sai, không phải trận không có.
             if ($curl['status'] === 'not_found') {
-                return null;
+                continue;
             }
 
             // curl không chắc (rỗng/không tìm ra nguồn) → fallback Playwright
@@ -461,9 +456,9 @@ class CrawlService
 
                 return ['url' => $data['embedUrl'], 'type' => $data['type'] ?? 'iframe'];
             }
-            // "not found" → bỏ qua toàn bộ match luôn (không thử pattern khác)
+            // "not found" cho URL này → thử pattern khác (xem giải thích ở trên).
             if (isset($data['error']) && str_contains($data['error'], 'not found')) {
-                return null;
+                continue;
             }
             usleep(500000);
         }
