@@ -33,11 +33,19 @@ class CrawlMatchesJob implements ShouldQueue, ShouldBeUnique
         // Hết quota là chuyện bình thường (backfill vừa ăn hết) — log rồi bỏ qua
         // phần Highlightly, đừng ném để mỗi 30 phút lại đẻ một failed_job.
         try {
-            for ($i = 0; $i < 2; $i++) {
-                $date   = now()->subDays($i)->format('Y-m-d');
-                $result = $highlightly->syncDate($date);
-                Log::info("CrawlMatchesJob: syncDate {$date}", $result);
-                if ($i === 0) sleep(1);
+            $result = $highlightly->syncDate(now()->format('Y-m-d'));
+            Log::info('CrawlMatchesJob: syncDate ' . now()->format('Y-m-d'), $result);
+
+            // "Hôm qua" gần như không đổi sau vài giờ đầu ngày (trận đã đá xong
+            // hết, chốt số liệu rồi) — chỉ requery trong khung 6h đầu (UTC, app
+            // timezone) để bắt trận đá muộn xuyên ngày, tránh fetch lại 48
+            // lần/ngày suốt cả ngày (tốn ~nửa tổng request Highlightly cho dữ
+            // liệu gần như không đổi).
+            if (now()->hour < 6) {
+                sleep(1);
+                $yDate   = now()->subDay()->format('Y-m-d');
+                $yResult = $highlightly->syncDate($yDate);
+                Log::info("CrawlMatchesJob: syncDate {$yDate}", $yResult);
             }
 
             // Venue + events: cron trước đây không gọi nên trận sync qua cron
