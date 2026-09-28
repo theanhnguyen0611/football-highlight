@@ -436,9 +436,15 @@ class CrawlService
                 continue;
             }
 
-            // curl không chắc (rỗng/không tìm ra nguồn) → fallback Playwright
+            // curl không chắc (rỗng/không tìm ra nguồn) → fallback Playwright.
+            // dasfootball-embed.js có timeout nội bộ (30s goto + 4s wait) nhưng
+            // đó là timeout CỦA Playwright — nếu tiến trình Chromium treo bất
+            // thường (không thoát), shell_exec() sẽ đợi vô thời hạn, kẹt luôn cả
+            // job (đã xảy ra trên prod 24/09: 1 tiến trình Chromium treo sống,
+            // job cứ retry đúng trận đó mỗi lần chạy do luôn ưu tiên trận mới
+            // nhất, không bao giờ tiến được). `timeout` ngoài chặn cứng ở 45s.
             $escapedUrl = escapeshellarg($tryUrl);
-            $output     = shell_exec("node {$scriptPath} {$escapedUrl} 2>/dev/null");
+            $output     = shell_exec("timeout 45 node {$scriptPath} {$escapedUrl} 2>/dev/null");
             if (!$output) { usleep(500000); continue; }
 
             $data = json_decode(trim($output), true);
