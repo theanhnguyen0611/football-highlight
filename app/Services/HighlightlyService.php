@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Log;
 
 class HighlightlyService
 {
-    private string $baseUrl = 'https://soccer.highlightly.net';
+    // Đổi từ soccer.highlightly.net (gói Football API riêng) sang
+    // sports.highlightly.net/football (gói "Sport API" gộp nhiều môn) — gia
+    // hạn nhầm gói 28/09, response schema giống hệt nên chỉ cần đổi base URL.
+    private string $baseUrl = 'https://sports.highlightly.net/football';
 
     private const TOP_LEAGUE_IDS = [
         33973, 119924, 67162, 61205, 52695, 2486, 3337,
