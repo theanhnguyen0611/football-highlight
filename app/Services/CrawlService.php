@@ -393,6 +393,15 @@ class CrawlService
         return null;
     }
 
+    // DasFootball đặt tên đội khác Highlightly — map slug tên trong DB sang
+    // slug DasFootball dùng. Chỉ thêm alias đã xác minh qua
+    // https://dasfootball.com/sitemap/posts.xml.
+    private const DASFOOTBALL_ALIASES = [
+        'turkey'               => ['turkiye'],
+        'republic-of-ireland'  => ['rep-of-ireland'],
+        'kosovo-national-team' => ['kosovo'],
+    ];
+
     // ─── Crawl dasfootball.com (Next.js JS-rendered) via Playwright ─
     public function crawlDasFootball(FootballMatch $match): ?array
     {
@@ -400,14 +409,18 @@ class CrawlService
         $away = Str::slug($match->awayTeam->name);
         $date = is_string($match->match_date) ? substr($match->match_date, 0, 10) : $match->match_date->format('Y-m-d');
 
-        $patterns = [
-            "https://dasfootball.com/{$home}-vs-{$away}-highlights-{$date}/",
-            "https://dasfootball.com/{$away}-vs-{$home}-highlights-{$date}/",
-            "https://dasfootball.com/{$home}-vs-{$away}-match-highlights-{$date}/",
-            "https://dasfootball.com/{$away}-vs-{$home}-match-highlights-{$date}/",
-            "https://dasfootball.com/{$home}-vs-{$away}-{$date}/",
-            "https://dasfootball.com/{$away}-vs-{$home}-{$date}/",
-        ];
+        $homes = array_merge([$home], self::DASFOOTBALL_ALIASES[$home] ?? []);
+        $aways = array_merge([$away], self::DASFOOTBALL_ALIASES[$away] ?? []);
+
+        $patterns = [];
+        foreach (['highlights-', 'match-highlights-', ''] as $suffix) {
+            foreach ($homes as $h) {
+                foreach ($aways as $a) {
+                    $patterns[] = "https://dasfootball.com/{$h}-vs-{$a}-{$suffix}{$date}/";
+                    $patterns[] = "https://dasfootball.com/{$a}-vs-{$h}-{$suffix}{$date}/";
+                }
+            }
+        }
 
         // DasFootball (Next.js) server-render sẵn contentUrl trong JSON-LD
         // VideoObject ngay trong HTML gốc → thử curl trước (rẻ, không cần

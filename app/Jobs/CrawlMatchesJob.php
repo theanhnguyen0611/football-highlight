@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Exceptions\HighlightlyQuotaException;
+use App\Models\FootballMatch;
 use App\Services\CrawlService;
 use App\Services\DownloadService;
 use App\Services\HighlightlyService;
@@ -13,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class CrawlMatchesJob implements ShouldQueue, ShouldBeUnique
@@ -46,6 +48,20 @@ class CrawlMatchesJob implements ShouldQueue, ShouldBeUnique
                 $yDate   = now()->subDay()->format('Y-m-d');
                 $yResult = $highlightly->syncDate($yDate);
                 Log::info("CrawlMatchesJob: syncDate {$yDate}", $yResult);
+            }
+
+            // Tự bù ngày bị lỡ: ngày nào trong 7 ngày qua chưa có trận nào trong
+            // DB (vd hết quota Highlightly 25–27/09 → mất trắng England vs Spain)
+            // thì sync lại. Cache::add chặn mỗi ngày trống chỉ thử lại 6h/lần —
+            // ngày thực sự không có trận nào sẽ không đốt quota mỗi 30 phút.
+            for ($i = 1; $i <= 7; $i++) {
+                $date = now()->subDays($i)->format('Y-m-d');
+                if (FootballMatch::whereDate('match_date', $date)->exists()) continue;
+                if (!Cache::add("crawl:backfill:{$date}", 1, now()->addHours(6))) continue;
+
+                sleep(1);
+                $bResult = $highlightly->syncDate($date);
+                Log::info("CrawlMatchesJob: backfill ngày trống {$date}", $bResult);
             }
 
             // Venue + events: cron trước đây không gọi nên trận sync qua cron
